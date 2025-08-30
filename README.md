@@ -1,0 +1,3 @@
+# Cool OS: A fully self-written x86_64 Operating System
+
+Still in early developement, will update later...
