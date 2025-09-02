@@ -1,5 +1,7 @@
 bits 16
-org 0x7C00                ; BIOS loads us here
+%ifndef __ELF__
+    org 0x7C00                ; BIOS loads us here
+%endif
 
 start:
     xor ax, ax
@@ -21,8 +23,9 @@ start:
 
 .load_st2:
     ; Load Stage 2 into 0x1000
-    mov es, 0x1000
     xor bx, bx
+    mov es, bx
+    mov bx, 0x1000       ; ES:BX = 0x0000:0x1000
 
     mov ah, 0x02        ; BIOS: read sectors
     mov al, ST2_SEC_CNT ; number of sectors
@@ -34,7 +37,7 @@ start:
     int 0x13
     jc .disk_fail       ; jump if error
 
-    jmp 0x1000:0x0000   ; jump to Stage 2 code
+    jmp 0x0000:0x1000   ; jump to Stage 2 code
 
 .disk_fail:
     mov si, disk_fail_msg

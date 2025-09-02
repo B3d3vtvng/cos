@@ -1,84 +1,121 @@
+; ; =========================
+; Stage 2 loader (NASM)
+; =========================
+; Expected setup by Stage 1:
+;   - Stage 2 is read to physical 0x1000
+;   - Jumped via   jmp 0x0000:0x1000
+; Therefore CS = 0x0000, IP = 0x1000, and physical addr = 0x1000.
+;
+
+%ifndef __ELF__
+    org 0x1000        ; Only valid for flat binary
+%endif
+
 bits 16
-org 0x1000                ; Stage 2 loads here
-
-gdt_start:
-    dq 0x0000000000000000 ; Null descriptor
-    dq 0x00CF9A000000FFFF ; Code segment descriptor
-    dq 0x00CF92000000FFFF ; Data segment descriptor
-gdt_end:
-
-gdt_table:
-    dw gdt_end - gdt_start - 1 ; Limit
-    dd gdt_start               ; Base
 
 start:
-    ; Print message using BIOS teletype (int 10h, AH=0Eh)
+    ; Make DS/ES match our code segment base (here CS expected to be 0x0000)
+    push cs
+    pop ds
+    mov ax, ds
+    mov es, ax
+
+    ; -------- Real-mode message --------
     mov si, msg
-.print_next:
-    lodsb                 ; AL = [SI], SI++
+.putc:
+    lodsb                   ; AL = [SI], SI++
     test al, al
-    jz .activate_pmode
-    mov ah, 0x0E
-    mov bx, 0x0007        ; BH=page 0, BL=attribute (gray on black)
+    jz   load_kernel
+    mov ah, 0x0E            ; teletype output
+    mov bh, 0x00            ; page
+    mov bl, 0x07            ; light gray on black
     int 0x10
-    jmp .print_next
+    jmp .putc
 
-.activate_pmode:
-    cli                     ; Clear interrupts
-    lgdt [gdt_table]       ; Load GDT
+; -------- Load kernel (BIOS int 13h, CHS simple case) --------
+; Kernel starts immediately after stage2:
+;   boot sector = sector 1
+;   stage2      = sectors [2 .. 1 + ST2_SEC_CNT]
+;   kernel      = starts at (2 + ST2_SEC_CNT)
+load_kernel:
+    ; Destination buffer = physical KERNEL_BASE
+    ; Use ES:BX = 0x0000:KERNEL_BASE (works as long as KERNEL_BASE < 64K)
+    xor ax, ax
+    mov es, ax
+    mov bx, KERNEL_BASE
+
+    mov ah, 0x02                 ; BIOS disk read
+    mov al, KERN_SEC_CNT         ; number of sectors to read
+    mov ch, 0x00                 ; cylinder 0
+    mov dh, 0x00                 ; head 0
+    mov cl, (2 + ST2_SEC_CNT)    ; starting sector (1-based)
+    ; DL (drive number) is preserved from Stage 1
+
+    int 0x13
+    jc  disk_fail                ; if CF set -> error
+
+    jmp enter_prot_mode
+
+disk_fail:
+    mov si, disk_fail_msg
+.df_putc:
+    lodsb
+    test al, al
+    jz   .halt
+    mov ah, 0x0E
+    mov bh, 0x00
+    mov bl, 0x07
+    int 0x10
+    jmp .df_putc
+.halt:
+    cli
+    hlt
+    jmp .halt
+
+; -------- Switch to 32-bit protected mode --------
+enter_prot_mode:
+    cli
+    lgdt [gdt_descriptor]        ; load our flat GDT
+
     mov eax, cr0
-    or eax, 1              ; Set PE bit
-    mov cr0, eax           ; Enter protected mode
-    jmp 0x08:.pmode_start  ; Far jump to flush prefetch queue
+    or  eax, 1                   ; set PE bit
+    mov cr0, eax
 
-.pmode_start:
-    ; Set up segment registers
-    mov ax, 0x10           ; Data segment selector
+    ; Far jump to flush prefetch queue and load CS = code selector (0x08)
+    jmp 0x08:pm_entry          ; jump to 32-bit code segment
+
+; -------- 32-bit code --------
+bits 32
+pm_entry:
+    ; Load data/stack segments = data selector (0x10)
+    mov ax, 0x10
     mov ds, ax
     mov es, ax
+    mov ss, ax
     mov fs, ax
     mov gs, ax
-    mov ss, ax
-    ; Set up stack
-    mov esp, 0x9FC00       ; Stack pointer (below 640KB
 
-    ; Now in 32-bit protected mode
-    ; Load the Kernel
-    call load_kernel
+    mov esp, 0x9FC00             ; simple stack (just below 640 KiB)
 
-load_kernel:
-    ; Load Kernel into KERNEL_BASE
-    xor bx, bx
-    mov es, KERNEL_BASE
-
-    mov ah, 0x02        ; BIOS: read sectors
-    mov al, KERNEL_SEC_CNT ; number of sectors
-    mov ch, 0           ; cylinder 0
-    mov cl, 2 + ST2_SEC_CNT ; sector (after boot + stage
-    mov dh, 0           ; head 0
-    mov dl, 0           ; drive (set by BIOS in DL)
-    int 0x13
-
-    jc .disk_fail       ; jump if error
-    jmp KERNEL_BASE:0x0000 ; jump to Kernel code
-
-.disk_fail:
-    mov si, disk_fail_msg
-    jmp .print_fail_loop
-.print_fail_loop:
-    lodsb                 ; AL = [SI], SI++
-    test al, al
-    jz .hang
-    mov ah, 0x0E
-    mov bx, 0x0007        ; BH=page 0, BL=
-    int 0x10
-    jmp .print_fail_loop
-.hang:
-    hlt
-    jmp .hang
-
-msg db "Stage 2 loaded. Switching into 32-bit protected mode...", 0xd, 0xa, 0x0
-disk_fail_msg db "Fatal Error: Disk read failed!", 0x0
+    ; Jump to kernel entry (flat linear address)
+    mov eax, KERNEL_BASE           ; KERNEL_BASE
+    jmp eax                       ; transfer control to kernel
 
 
 
+; -------- Data --------
+[bits 16]
+msg             db "Stage 2: Entering 32-bit protected mode...", 0x0D, 0x0A, 0
+disk_fail_msg   db "Stage 2: Disk read failed!", 0
+
+; -------- GDT (flat 0..4GiB) --------
+; 0x08 = code selector, 0x10 = data selector
+gdt_start:
+    dq 0x0000000000000000        ; null descriptor
+    dq 0x00CF9A000000FFFF        ; code: base=0, limit=4GiB, RX
+    dq 0x00CF92000000FFFF        ; data: base=0, limit=4GiB, RW
+gdt_end:
+
+gdt_descriptor:
+    dw gdt_end - gdt_start - 1
+    dd gdt_start
