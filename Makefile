@@ -15,28 +15,35 @@ build:
 	mkdir -p build
 
 # =========================
-# Kernel
+# Drivers
 # =========================
-build/kernel_entry.o: kernel/kernel_entry.c | build
+
+build/vga_control.o: kernel/io/vga_control.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/kernel_entry.elf: build/kernel_entry.o kernel.ld
+# =========================
+# Kernel
+# =========================
+build/kernel.o: kernel/kernel_main.c | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/kernel.elf: build/vga_control.o build/kernel.o kernel.ld
 	$(LD) $(LDFLAGS) -T kernel.ld $< -o $@
 
-build/kernel_entry.bin: build/kernel_entry.elf
-	$(OBJCOPY) -O binary --change-section-lma .text.boot=0x2000 build/kernel_entry.elf build/kernel_entry.bin
+build/kernel.bin: build/kernel.elf
+	$(OBJCOPY) -O binary --change-section-lma .text.boot=0x2000 build/kernel.elf build/kernel.bin
 
 # =========================
 # Stage 2 loader
 # =========================
 # First pass with dummy sector count
-build/stage2_temp.bin: boot/stage2.s build/kernel_entry.bin | build
-	$(eval KERNEL_SECTORS := $(shell expr $$(stat -f%z build/kernel_entry.bin) / 512 + 1))
+build/stage2_temp.bin: boot/stage2.s build/kernel.bin | build
+	$(eval KERNEL_SECTORS := $(shell expr $$(stat -f%z build/kernel.bin) / 512 + 1))
 	$(ASM) $(ASMFLAGS_BIN) -DKERN_SEC_CNT=$(KERNEL_SECTORS) -DKERNEL_BASE=0x2000 -DST2_SEC_CNT=1 $< -o $@
 
 # Final pass with real size
-build/stage2.bin build/stage2.elf: boot/stage2.s build/stage2_temp.bin build/kernel_entry.bin | build
-	$(eval KERNEL_SECTORS := $(shell expr $$(stat -f%z build/kernel_entry.bin) / 512 + 1))
+build/stage2.bin build/stage2.elf: boot/stage2.s build/stage2_temp.bin build/kernel.bin | build
+	$(eval KERNEL_SECTORS := $(shell expr $$(stat -f%z build/kernel.bin) / 512 + 1))
 	$(eval STAGE2_SECTORS := $(shell expr $$(stat -f%z build/stage2_temp.bin) / 512 + 1))
 	# Binary for booting
 	$(ASM) $(ASMFLAGS_BIN) -DKERN_SEC_CNT=$(KERNEL_SECTORS) -DKERNEL_BASE=0x2000 -DST2_SEC_CNT=$(STAGE2_SECTORS) $< -o build/stage2.bin
@@ -57,11 +64,11 @@ build/boot.bin build/boot.elf: boot/boot_sec.s build/stage2.bin | build
 # =========================
 # Disk image
 # =========================
-build/os.img: build/boot.bin build/stage2.bin build/kernel_entry.bin | build
+build/os.img: build/boot.bin build/stage2.bin build/kernel.bin | build
 	dd if=/dev/zero of=$@ bs=512 count=2880
 	dd if=build/boot.bin of=$@ conv=notrunc,sync
 	dd if=build/stage2.bin of=$@ bs=512 seek=1 conv=notrunc,sync
-	dd if=build/kernel_entry.bin of=$@ bs=512 \
+	dd if=build/kernel.bin of=$@ bs=512 \
 	seek=$$((1 + ( ($$(stat -f%z build/stage2.bin) + 511) / 512 ))) \
    	conv=notrunc,sync
 
@@ -75,7 +82,7 @@ run: build/os.img
 debug: build/os.img
 	qemu-system-i386 -fda $< -S -s &
 	sleep 1
-	gdb -ex "target remote localhost:1234" -ex "add-symbol-file build/boot.elf 0x7c00" -ex "add-symbol-file build/stage2.elf 0x1000" -ex "add-symbol-file build/kernel_entry.elf 0x2000"
+	gdb -ex "target remote localhost:1234" -ex "add-symbol-file build/boot.elf 0x7c00" -ex "add-symbol-file build/stage2.elf 0x1000" -ex "add-symbol-file build/kernel.elf 0x2000"
 
 clean:
 	rm -rf build
