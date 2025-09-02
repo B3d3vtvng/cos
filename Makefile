@@ -28,7 +28,7 @@ build/kernel.o: kernel/kernel_main.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/kernel.elf: build/vga_control.o build/kernel.o kernel.ld
-	$(LD) $(LDFLAGS) -T kernel.ld $< -o $@
+	$(LD) $(LDFLAGS) -T kernel.ld build/kernel.o build/vga_control.o -o $@
 
 build/kernel.bin: build/kernel.elf
 	$(OBJCOPY) -O binary --change-section-lma .text.boot=0x2000 build/kernel.elf build/kernel.bin

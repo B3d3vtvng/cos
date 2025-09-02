@@ -2,7 +2,7 @@
 
 void init_subsystems(void);
 
-__attribute__((noreturn)) 
+__attribute__((noreturn))
 __attribute__((section(".text.entry")))
 void kmain(void) {
     const char* msg = "Kernel loaded, initializing neccessary components...";
