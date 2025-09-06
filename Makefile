@@ -4,7 +4,7 @@ LD      = x86_64-elf-ld
 OBJCOPY = x86_64-elf-objcopy
 ASM     = nasm
 
-CFLAGS  = -m32 -ffreestanding -O0 -Wall -Wextra -g
+CFLAGS  = -m32 -ffreestanding -O0 -g
 LDFLAGS = -m elf_i386
 ASMFLAGS_BIN = -f bin
 ASMFLAGS_ELF = -f elf32 -g -F dwarf
@@ -21,14 +21,36 @@ build:
 build/vga_control.o: kernel/io/vga_control.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
 
+build/alloc_init.o: kernel/mem/alloc_init.c | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/memutils.o: kernel/mem/memutils.c | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/conversion.o: kernel/io/conversion.c | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/idt_init.o: kernel/interrupts/idt_init.c | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/cpu_excp_handlers.o: kernel/interrupts/cpu_excp_handlers.s | build
+	$(ASM) $(ASMFLAGS_ELF) $< -o $@
+
 # =========================
 # Kernel
 # =========================
-build/kernel.o: kernel/kernel_main.c | build
+
+build/kernel_main.o : kernel/kernel_main.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/kernel.elf: build/vga_control.o build/kernel.o kernel.ld
-	$(LD) $(LDFLAGS) -T kernel.ld build/kernel.o build/vga_control.o -o $@
+build/kernel_entry.o: kernel/entry/kernel_entry.c | build
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/kernel_switch_stacks.o: kernel/entry/kernel_switch_stack.s | build
+	$(ASM) $(ASMFLAGS_ELF) $< -o $@
+
+build/kernel.elf: build/kernel_main.o build/idt_init.o build/cpu_excp_handlers.o build/kernel_switch_stacks.o build/conversion.o build/alloc_init.o build/memutils.o build/vga_control.o build/kernel_entry.o kernel.ld
+	$(LD) $(LDFLAGS) -T kernel.ld build/kernel_entry.o build/kernel_main.o build/idt_init.o build/cpu_excp_handlers.o build/kernel_switch_stacks.o build/vga_control.o build/alloc_init.o build/memutils.o build/conversion.o -o $@
 
 build/kernel.bin: build/kernel.elf
 	$(OBJCOPY) -O binary --change-section-lma .text.boot=0x2000 build/kernel.elf build/kernel.bin
@@ -82,7 +104,7 @@ run: build/os.img
 debug: build/os.img
 	qemu-system-i386 -fda $< -S -s &
 	sleep 1
-	gdb -ex "target remote localhost:1234" -ex "add-symbol-file build/boot.elf 0x7c00" -ex "add-symbol-file build/stage2.elf 0x1000" -ex "add-symbol-file build/kernel.elf 0x2000"
+	gdb -ex "target remote localhost:1234" -ex "add-symbol-file build/boot.elf 0x7c00" -ex "add-symbol-file build/stage2.elf 0x1000" -ex "add-symbol-file build/kernel.elf 0x2000" -ex "add-symbol-file build/kernel_switch_stacks.elf"
 
 clean:
 	rm -rf build

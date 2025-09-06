@@ -1,24 +1,17 @@
 #include "io/vga_control.h"
+#include "mem/alloc_init.h"
+#include "mem/memutils.h"
+#include "interrupts/idt.h"
+#include <stdint.h>
 
-void init_subsystems(void);
+void __attribute__((noreturn)) kmain(void) {
+    vga_print("Reached kernel main, now enabling virtualization and 64-bit long mode...\n");
 
-__attribute__((noreturn))
-__attribute__((section(".text.entry")))
-void kmain(void) {
-    const char* msg = "Kernel loaded, initializing neccessary components...";
-
-    vga_clear();
-    vga_print(msg);
-    init_subsystems();
-    
-    // Halt forever
+    struct idt_ptr idt_pointer = idt_init();
+    int x = 1/0;
+    //enable_virt();
+    //enter_long_mode();
     while (1) {
         __asm__ __volatile__ ("hlt");
     }
-}
-
-
-
-void init_subsystems(void) {
-
 }

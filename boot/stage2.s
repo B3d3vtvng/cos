@@ -54,7 +54,7 @@ load_kernel:
     int 0x13
     jc  disk_fail                ; if CF set -> error
 
-    jmp enter_prot_mode
+    jmp load_bios_mmap          ; continue to load BIOS memory map
 
 disk_fail:
     mov si, disk_fail_msg
@@ -71,6 +71,36 @@ disk_fail:
     cli
     hlt
     jmp .halt
+
+load_bios_mmap:
+    ; Get BIOS memory map via int 0x15, eax=0xE820
+    ; Store entries starting at 0x9004, max 20 bytes each
+    ; Store number of entries at 0x9000
+    mov ax, 0
+    mov es, ax
+    mov di, 0x7504              ; buffer starts here
+    xor ebx, ebx                 ; continuation = 0
+    mov edx, 0x534D4150          ; 'SMAP'
+    mov ecx, 20                  ; entry size we want
+    mov esi, 0                   ; entry counter
+
+.next_entry:
+    mov eax, 0xE820
+    int 0x15
+    jc .done
+    cmp eax, 0x534D4150
+    jne .done
+
+    inc esi                      ; count entry
+    add edi, 20                  ; advance buffer pointer
+
+    test ebx, ebx
+    jnz .next_entry
+
+.done:
+    mov [0x7500], esi           ; store entry count at 0x9000
+    jmp enter_prot_mode
+
 
 ; -------- Switch to 32-bit protected mode --------
 enter_prot_mode:
