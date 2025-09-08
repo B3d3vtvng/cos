@@ -1,5 +1,5 @@
-#include "../io/vga_control.h"
-#include "../mem/alloc_init.h"
+#include "../include/vga_control.h"
+#include "../include/alloc_init.h"
 
 extern void __attribute__((noreturn)) switch_stack_and_jmp(void* new_stack);
 
@@ -19,8 +19,9 @@ KERN_ENTRY void _start(void) {
 
     vga_print("Initialization failed, halting...\n");
     
-    // Halt forever (will never be reached until something goes horribly wrong...)
-    while (1) {
-        __asm__ __volatile__ ("hlt");
+    while (1){
+        __asm__ __volatile__ (
+            "hlt"
+        );
     }
 }

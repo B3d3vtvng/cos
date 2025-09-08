@@ -1,4 +1,4 @@
-#include "vga_control.h"
+#include "../include/vga_control.h"
 
 char* vga_text_buf_pos = (char*)0xB8000;
 char* vga_cursor_pos = (char*)0xB8000;

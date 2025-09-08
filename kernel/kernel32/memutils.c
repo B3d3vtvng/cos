@@ -1,4 +1,4 @@
-#include "memutils.h"
+#include "../include/memutils.h"
 
 void memset(void* dest, char val, unsigned long len) {
     unsigned char* ptr = (unsigned char*)dest;

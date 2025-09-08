@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "conversion.h": "c",
+        "stdint.h": "c",
+        "alloc_init.h": "c"
+    }
+}

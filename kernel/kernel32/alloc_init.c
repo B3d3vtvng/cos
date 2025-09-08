@@ -1,10 +1,9 @@
-#include "alloc_init.h"
-#include "../io/conversion.h"
+#include "../include/alloc_init.h"
 
 static struct bios_mmap_entry usable_entries[64];
 static struct alloc_metadata alloc_meta;
 
-void* kpgmalloc(unsigned long count){
+void* kpgmalloc32(unsigned long count){
     if (count == 0 || count > KPG_MALLOC_MAX) {
         return (void*)0; // Invalid size
     }
@@ -35,32 +34,6 @@ void* kpgmalloc(unsigned long count){
     }
 
     return (void*)0; // No sufficient memory
-}
-
-void kpgfree(void* ptr) {
-    if (ptr == (void*)0 || (uint64_t)ptr < (uint64_t)ALLOC_BASE) {
-        return; // Invalid pointer
-    }
-
-    uint64_t addr = (uint64_t)ptr;
-    if ((addr - (uint64_t)ALLOC_BASE) % PAGE_SZ != 0) {
-        return; // Not page-aligned
-    }
-
-    uint64_t index = (addr - (uint64_t)ALLOC_BASE) / PAGE_SZ;
-    if (index >= alloc_meta.alloc_entry_count * 8) {
-        return; // Out of bounds
-    }
-
-    if (alloc_meta.alloc_entries[index].used == 0) {
-        return; // Double free or invalid free
-    }
-
-    uint64_t count = alloc_meta.alloc_entries[index].contiguous_count;
-    for (uint64_t i = 0; i < count; i++) {
-        alloc_meta.alloc_entries[index + i].used = 0;
-        alloc_meta.alloc_entries[index + i].contiguous_count = 0;
-    }
 }
 
 static inline uint64_t round_page_down(uint64_t addr) {

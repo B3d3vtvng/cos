@@ -10,7 +10,7 @@ extern kmain
 switch_stack_and_jmp:
     mov esp, [esp + 4]   ; Load new stack pointer from argument
     xor ebp, ebp         ; Clear base pointer
-    jmp kmain            ; Jump to kernel main function
+    jmp kinit            ; Jump to kernel main function
 
     ; Prevent fallthrough
     hlt

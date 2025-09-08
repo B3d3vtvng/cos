@@ -1,7 +1,10 @@
-#include "../io/vga_control.h"
-#include "../mem/alloc_init.h"
+#ifndef __IDT_H__
+#define __IDT_H__
+
+#include "vga_control.h"
+#include "alloc_init.h"
 #include <stdint.h>
-#include "../io/conversion.h"
+#include "conversion.h"
 
 struct idt_entry {
     uint16_t offset_low;    // Lower 16 bits of handler function address
@@ -17,3 +20,5 @@ struct idt_ptr {
 } __attribute__((packed)); // Full size: 6 bytes
 
 struct idt_ptr idt_init(void);
+
+#endif

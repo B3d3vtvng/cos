@@ -1,0 +1,18 @@
+#ifndef __KERNEL_H__
+#define __KERNEL_H__
+
+#include "vga_control.h"
+#include "alloc_init.h"
+#include "memutils.h"
+#include "idt.h"
+#include "paging.h"
+#include <stdint.h>
+
+
+
+struct kern_data{
+    struct idt_ptr idt_pointer;
+    struct pagetable* pml4;
+};
+
+#endif

@@ -2,7 +2,7 @@
 #define __ALLOC_CONTROL_H__
 
 #include "memutils.h"
-#include "../io/vga_control.h"
+#include "vga_control.h"
 #include <stdint.h>
 
 #define BIOS_MMAP_ADDR      ((struct bios_mmap_entry*)0x7504)
