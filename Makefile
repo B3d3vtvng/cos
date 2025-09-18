@@ -61,10 +61,10 @@ build/asm/asm32/%.o: kernel/asm/asm32/%.s | build
 	$(ASM) $(ASMFLAGS32) $< -o $@
 
 # 32-bit ASM (long_mode_jmp.s) with KMAIN_ADDR
+KMAIN_ADDR=$(shell nm -g build/kernel64.elf | grep ' kmain$$' | awk '{print "0x"$$1}')
 build/asm/asm32/long_mode_jmp.o: kernel/asm/asm32/long_mode_jmp.s build/kernel64.elf | build
 	@mkdir -p $(dir $@)
-	KMAIN_ADDR=$(shell nm -g build/kernel64.elf | grep ' kmain$$' | awk '{print "0x"$$1}')
-	$(ASM) $(ASMFLAGS32) -DKMAIN_ADDR=$$KMAIN_ADDR $< -o $@
+	$(ASM) $(ASMFLAGS32) -DKMAIN_ADDR=$(KMAIN_ADDR) $< -o $@
 
 # 64-bit ASM
 build/asm/asm64/%.o: kernel/asm/asm64/%.s | build

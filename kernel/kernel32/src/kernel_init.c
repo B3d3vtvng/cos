@@ -55,28 +55,7 @@ struct kern_data kernel_dat;
 
 void __attribute__((noreturn)) enter_long_mode(void) {
     init_gdt64(); // prepare 64-bit GDT
-
-    __asm__ __volatile__ (
-        // Load GDT
-        "lgdt %[gdt]\n\t"
-
-        // Enable long mode in IA32_EFER MSR
-        "mov $0xC0000080, %%ecx\n\t"
-        "rdmsr\n\t"
-        "or $(1 << 8), %%eax\n\t"
-        "wrmsr\n\t"
-
-        // Enable paging
-        "mov %%cr0, %%eax\n\t"
-        "or $(1 << 31), %%eax\n\t"
-        "mov %%eax, %%cr0\n\t"
-
-        "jmp long_mode_jmp"
-
-        :
-        : [gdt] "m" (gdt64_ptr)
-        : "eax", "ecx", "edx"
-    );
+    long_mode_jmp();
 
     __builtin_unreachable();
 }
