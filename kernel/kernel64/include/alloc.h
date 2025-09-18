@@ -3,6 +3,7 @@
 
 #include "memutils.h"
 #include "vga_control.h"
+#include "conversion.h"
 #include <stdint.h>
 
 #define BIOS_MMAP_ADDR      ((struct bios_mmap_entry*)0x7504)
@@ -12,12 +13,6 @@
 #define PAGE_SZ 0x1000ULL
 #define KPG_MALLOC_MAX 128
 #define KERNEL_STACK_PG_COUNT 5
-
-struct bios_mmap_entry {
-    uint64_t base_addr;
-    uint64_t length;
-    uint32_t type;
-} __attribute__((packed));
 
 struct pg_entry {
     int used : 1;
@@ -29,7 +24,6 @@ struct alloc_metadata {
     uint64_t alloc_entry_count;
 };
 
-void* init_allocator(void);
 void* kpgmalloc(unsigned long size);
 void kpgfree(void* ptr);
 

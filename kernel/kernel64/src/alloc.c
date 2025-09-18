@@ -1,6 +1,11 @@
-#include "../include/alloc_init.h"
+#include "../include/alloc.h"
 
 static struct alloc_metadata alloc_meta;
+
+void alloc_init64(struct alloc_metadata* alloc_meta_old){
+    alloc_meta.alloc_entries = alloc_meta_old->alloc_entries;
+    alloc_meta.alloc_entry_count = alloc_meta_old->alloc_entry_count;
+}
 
 void kpgfree(void* ptr) {
     if (ptr == (void*)0 || (uint64_t)ptr < (uint64_t)ALLOC_BASE) {

@@ -2,10 +2,10 @@
 
 struct pagetable* init_paging(void){
     //Allocate pagetables
-    struct pagetable* pml4 = kpgmalloc(1);
-    struct pagetable* pdpt = kpgmalloc(1);
-    struct pagetable* pd = kpgmalloc(1);
-    struct pagetable* pt = kpgmalloc(1);
+    struct pagetable* pml4 = kpgmalloc32(1);
+    struct pagetable* pdpt = kpgmalloc32(1);
+    struct pagetable* pd = kpgmalloc32(1);
+    struct pagetable* pt = kpgmalloc32(1);
 
     //Initialize tables to 0
     for (int i = 0; i < ENTRIES_PER_TABLE; i++){

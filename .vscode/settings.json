@@ -2,6 +2,9 @@
     "files.associations": {
         "conversion.h": "c",
         "stdint.h": "c",
-        "alloc_init.h": "c"
+        "alloc_init.h": "c",
+        "memutils.h": "c",
+        "paging.h": "c",
+        "vga_control.h": "c"
     }
 }

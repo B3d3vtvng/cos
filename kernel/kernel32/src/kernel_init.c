@@ -53,33 +53,38 @@ void init_gdt64() {
 
 struct kern_data kernel_dat;
 
-void __attribute__((noreturn)) enter_long_mode(void){
+void __attribute__((noreturn)) enter_long_mode(void) {
+    init_gdt64(); // prepare 64-bit GDT
+
     __asm__ __volatile__ (
-    // Enable LME (long mode enable) in IA32_EFER (MSR 0xC0000080)
-    "mov $0xC0000080, %%ecx\n\t"
-    "rdmsr\n\t"
-    "or $(1 << 8), %%eax\n\t"
-    "wrmsr\n\t"
+        // Load GDT
+        "lgdt %[gdt]\n\t"
 
-    // Enable paging (PG bit in CR0)
-    "mov %%cr0, %%eax\n\t"
-    "or $(1 << 31), %%eax\n\t"
-    "mov %%eax, %%cr0\n\t"
-    :
-    :
-    : "eax", "ecx", "edx"
-);
+        // Enable long mode in IA32_EFER MSR
+        "mov $0xC0000080, %%ecx\n\t"
+        "rdmsr\n\t"
+        "or $(1 << 8), %%eax\n\t"
+        "wrmsr\n\t"
 
-    init_gdt64();
-    long_mode_jmp();
+        // Enable paging
+        "mov %%cr0, %%eax\n\t"
+        "or $(1 << 31), %%eax\n\t"
+        "mov %%eax, %%cr0\n\t"
+
+        "jmp long_mode_jmp"
+
+        :
+        : [gdt] "m" (gdt64_ptr)
+        : "eax", "ecx", "edx"
+    );
 
     __builtin_unreachable();
 }
 
 void __attribute__((noreturn)) kinit(void) {
-    vga_print("Reached kernel main, now enabling virtualization and 64-bit long mode...\n");
+    vga_print32("Reached kernel init, now enabling virtualization and 64-bit long mode...\n");
 
-    kernel_dat.pml4 = init_paging();
+    kernel_dat.pml4 = init_paging(); // sets CR3, enables PAE
 
     enter_long_mode();
 

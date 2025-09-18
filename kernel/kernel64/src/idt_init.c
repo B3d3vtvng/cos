@@ -1,4 +1,4 @@
-#include "idt.h"
+#include "../include/idt.h"
 
 #define HANDLER_DECLARE(n) extern void isr_##n();
 #define HANDLER_ADD(n) set_idt_gate(idt, n, (uint32_t)isr_##n);

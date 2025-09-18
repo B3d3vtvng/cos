@@ -4,11 +4,9 @@
 #include "vga_control.h"
 #include "alloc_init.h"
 #include "memutils.h"
-#include "idt.h"
 #include "paging.h"
+#include "../../kernel64/include/idt.h"
 #include <stdint.h>
-
-
 
 struct kern_data{
     struct idt_ptr idt_pointer;

@@ -8,16 +8,16 @@ extern void __attribute__((noreturn)) switch_stack_and_jmp(void* new_stack);
 KERN_ENTRY void _start(void) {
     const char* msg = "Kernel loaded, initializing allocator for stack relocation...\n";
 
-    vga_clear();
-    vga_print(msg);
+    vga_clear32();
+    vga_print32(msg);
     void* new_kern_stack = init_allocator();
     if (new_kern_stack != (void*)0) {
         // Switch to new stack
-        vga_print("Switching to new stack...\n");
+        vga_print32("Switching to new stack...\n");
         switch_stack_and_jmp(new_kern_stack);
     }
 
-    vga_print("Initialization failed, halting...\n");
+    vga_print32("Initialization failed, halting...\n");
     
     while (1){
         __asm__ __volatile__ (

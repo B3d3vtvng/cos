@@ -18,17 +18,17 @@ ASMFLAGS64   = -f elf64 -g -F dwarf
 # =====================================
 # Sources & Objects
 # =====================================
-C_SRC32   := $(wildcard kernel/kernel32/**/*.c kernel/kernel32/*.c)
-C_SRC64   := $(wildcard kernel/kernel64/**/*.c kernel/kernel64/*.c)
-ASM_SRC32 := $(wildcard kernel/asm32/**/*.s kernel/asm32/*.s)
-ASM_SRC64 := $(wildcard kernel/asm64/**/*.s kernel/asm64/*.s)
+C_SRC32   := $(wildcard kernel/kernel32/src/**/*.c kernel/kernel32/src/*.c)
+C_SRC64   := $(wildcard kernel/kernel64/src/**/*.c kernel/kernel64/src/*.c)
+ASM_SRC32 := $(wildcard kernel/asm/asm32/**/*.s kernel/asm/asm32/*.s)
+ASM_SRC64 := $(wildcard kernel/asm/asm64/**/*.s kernel/asm/asm64/*.s)
 
 OBJ_C32 := $(patsubst kernel/kernel32/%.c, build/kernel32/%.o, $(C_SRC32))
-OBJ_A32 := $(patsubst kernel/asm32/%.s,     build/asm32/%.o,    $(ASM_SRC32))
-OBJ32   := $(OBJ_C32) $(OBJ_A32)
+OBJ_A32 := $(patsubst kernel/asm/asm32/%.s, build/asm/asm32/%.o, $(filter-out kernel/asm/asm32/long_mode_jmp.s, $(ASM_SRC32)))
+OBJ32   := $(OBJ_C32) $(OBJ_A32) build/asm/asm32/long_mode_jmp.o
 
 OBJ_C64 := $(patsubst kernel/kernel64/%.c, build/kernel64/%.o, $(C_SRC64))
-OBJ_A64 := $(patsubst kernel/asm64/%.s,     build/asm64/%.o,    $(ASM_SRC64))
+OBJ_A64 := $(patsubst kernel/asm/asm64/%.s, build/asm/asm64/%.o, $(ASM_SRC64))
 OBJ64   := $(OBJ_C64) $(OBJ_A64)
 
 OBJ := $(OBJ32) $(OBJ64)
@@ -55,31 +55,36 @@ build/kernel64/%.o: kernel/kernel64/%.c | build
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS64) -c $< -o $@
 
-# 32-bit ASM
-build/asm32/%.o: kernel/asm32/%.s | build
+# 32-bit ASM (all except long_mode_jmp.s)
+build/asm/asm32/%.o: kernel/asm/asm32/%.s | build
 	@mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS32) $< -o $@
+
+# 32-bit ASM (long_mode_jmp.s) with KMAIN_ADDR
+build/asm/asm32/long_mode_jmp.o: kernel/asm/asm32/long_mode_jmp.s build/kernel64.elf | build
+	@mkdir -p $(dir $@)
+	KMAIN_ADDR=$(shell nm -g build/kernel64.elf | grep ' kmain$$' | awk '{print "0x"$$1}')
+	$(ASM) $(ASMFLAGS32) -DKMAIN_ADDR=$$KMAIN_ADDR $< -o $@
 
 # 64-bit ASM
-build/asm64/%.o: kernel/asm64/%.s | build
+build/asm/asm64/%.o: kernel/asm/asm64/%.s | build
 	@mkdir -p $(dir $@)
 	$(ASM) $(ASMFLAGS64) $< -o $@
-
-# If you have other asm files placed directly under kernel/, you can add:
-build/%.o: kernel/%.s | build
-	@mkdir -p $(dir $@)
-	$(ASM) $(ASMFLAGS32) $< -o $@
 
 # =====================================
 # Kernel
 # =====================================
-# NOTE: Adjust linking (64-bit vs 32-bit) to match your kernel.ld & loader expectations.
-# This uses a 64-bit link; if you need an ELF32 kernel, change to LDFLAGS32 and adjust inputs.
-build/kernel.elf: $(OBJ) kernel.ld
-	$(LD) $(LDFLAGS64) -T kernel.ld $(OBJ) -o $@
+build/kernel32.elf: $(OBJ32) kernel.ld
+	$(LD) $(LDFLAGS32) -T kernel.ld $(OBJ32) -o $@
 
-build/kernel.bin: build/kernel.elf
-	$(OBJCOPY) -O binary --change-section-lma .text.boot=0x2000 $< $@
+build/kernel64.elf: $(OBJ64) kernel.ld
+	$(LD) $(LDFLAGS64) -T kernel.ld $(OBJ64) -o $@
+
+build/kernel.bin: build/kernel64.elf build/kernel32.elf
+	$(OBJCOPY) -O binary build/kernel32.elf $@
+	$(OBJCOPY) -O binary build/kernel64.elf build/kernel64.bin.tmp
+	cat build/kernel64.bin.tmp >> $@
+	rm -f build/kernel64.bin.tmp
 
 # =====================================
 # Stage 2 loader
@@ -122,13 +127,21 @@ build/os.img: build/boot.bin build/stage2.bin build/kernel.bin | build
 run: build/os.img
 	qemu-system-i386 -fda $<
 
-debug: build/os.img
-	qemu-system-i386 -fda $< -S -s &
+debug: build/os.img build/kernel64.elf build/kernel32.elf build/stage2.elf build/boot.elf
+	qemu-system-i386 -fda build/os.img -S -s &
 	sleep 1
-	gdb -ex "target remote localhost:1234" \
-	    -ex "add-symbol-file build/boot.elf 0x7c00" \
-	    -ex "add-symbol-file build/stage2.elf 0x1000" \
-	    -ex "add-symbol-file build/kernel.elf 0x2000"
+	# Lade alle Symbole automatisch, keine Bestätigung nötig
+	$(eval GDB_CMDS := \
+		-ex "target remote localhost:1234" \
+		-ex "add-symbol-file build/boot.elf 0x7c00" \
+		-ex "add-symbol-file build/stage2.elf 0x1000" \
+		-ex "add-symbol-file build/kernel32.elf 0x2000" \
+		-ex "add-symbol-file build/kernel64.elf $(shell nm -g build/kernel64.elf | grep ' kmain$$' | awk '{print "0x"$$1}')" \
+	)
+	gdb $(GDB_CMDS) --tui
 
+# =====================================
+# Clean
+# =====================================
 clean:
 	rm -rf build

@@ -36,21 +36,21 @@ void* kpgmalloc32(unsigned long count){
     return (void*)0; // No sufficient memory
 }
 
-static inline uint64_t round_page_down(uint64_t addr) {
+static inline uint64_t round_page_down32(uint64_t addr) {
     return addr & ~(PAGE_SZ - 1);
 }
 
 // Round up to nearest page
-static inline uint64_t round_page_up(uint64_t addr) {
+static inline uint64_t round_page_up32(uint64_t addr) {
     return (addr + PAGE_SZ - 1) & ~(PAGE_SZ - 1);
 }
 
 void print_usable(uint64_t total_mem){
-    vga_print("Total usable memory: ");
+    vga_print32("Total usable memory: ");
     char mem_str[20];
-    uint_to_str((unsigned int)(total_mem / (1024 * 1024)), mem_str, 10);
-    vga_print(mem_str);
-    vga_print(" MB\n");
+    uint_to_str32((unsigned int)(total_mem / (1024 * 1024)), mem_str, 10);
+    vga_print32(mem_str);
+    vga_print32(" MB\n");
 }
 
 void* init_allocator(void) {
@@ -72,23 +72,23 @@ void* init_allocator(void) {
 
     total_mem -= 0x1000; //Account for alloc btmap in 0x10000 to 0x11000
 
-    vga_print("Loaded BIOS memory map\n");
+    vga_print32("Loaded BIOS memory map\n");
     print_usable(total_mem);
 
     alloc_meta.alloc_entries = (struct pg_entry*)ALLOC_ENTRY_BASE;
-    memset(alloc_meta.alloc_entries, 0, PAGE_SZ); // Clear bitmap area
-    alloc_meta.alloc_entry_count = round_page_down(total_mem) / PAGE_SZ / 8; // Each entry is 1 byte
+    memset32(alloc_meta.alloc_entries, 0, PAGE_SZ); // Clear bitmap area
+    alloc_meta.alloc_entry_count = round_page_down32(total_mem) / PAGE_SZ / 8; // Each entry is 1 byte
 
-    vga_print("Initialized memory allocator: ");
+    vga_print32("Initialized memory allocator: ");
     char btmap_sz_str[20];
-    uint_to_str((unsigned int)alloc_meta.alloc_entry_count, btmap_sz_str, 10);
-    vga_print(btmap_sz_str);
-    vga_print(" usable pages\n");
+    uint_to_str32((unsigned int)alloc_meta.alloc_entry_count, btmap_sz_str, 10);
+    vga_print32(btmap_sz_str);
+    vga_print32(" usable pages\n");
 
-    void* stack_ptr = kpgmalloc(KERNEL_STACK_PG_COUNT);
+    void* stack_ptr = kpgmalloc32(KERNEL_STACK_PG_COUNT);
 
     if (stack_ptr == (void*)0) {
-        vga_print("Failed to allocate kernel stack\n");
+        vga_print32("Failed to allocate kernel stack\n");
         return 0;
     }
 

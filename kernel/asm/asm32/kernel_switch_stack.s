@@ -2,7 +2,7 @@
 
 section .text
 global switch_stack_and_jmp
-extern kmain
+extern kinit
 
 ; Switch to new stack and jump to kmain
 ; new_stack: pointer to the top of the new stack

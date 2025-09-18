@@ -1,3 +1,5 @@
+[bits 32]
+
 section .text
 
     global long_mode_jmp
@@ -5,5 +7,6 @@ section .text
     extern kernel_dat
 
 long_mode_jmp:
-    mov rdi, kernel_dat
-    jmp 0x08:kmain
+    push kernel_dat
+    push 0x00000000
+    jmp 0x08:KMAIN_ADDR

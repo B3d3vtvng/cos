@@ -1,6 +1,6 @@
 #include "../include/alloc_init.h"
 
-void int_to_str(int value, char* str, int base) {
+void int_to_str32(int value, char* str, int base) {
     if (base < 2 || base > 36) {
         *str = '\0';
         return;
@@ -33,7 +33,7 @@ void int_to_str(int value, char* str, int base) {
     }
 }
 
-int str_to_int(const char* str, int base) {
+int str_to_int32(const char* str, int base) {
     if (base < 2 || base > 36) {
         return 0;
     }
@@ -72,7 +72,7 @@ int str_to_int(const char* str, int base) {
     return sign * result;
 }
 
-void uint_to_str(unsigned int value, char* str, int base) {
+void uint_to_str32(unsigned int value, char* str, int base) {
     if (base < 2 || base > 36) {
         *str = '\0';
         return;
@@ -96,7 +96,7 @@ void uint_to_str(unsigned int value, char* str, int base) {
     }
 }
 
-unsigned int str_to_uint(const char* str, int base) {
+unsigned int str_to_uint32(const char* str, int base) {
     if (base < 2 || base > 36) {
         return 0;
     }
