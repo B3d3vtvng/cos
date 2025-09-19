@@ -53,9 +53,9 @@ struct idt_ptr {
 #define IDT_SIZE 256
 
 void excp_handler_common(const char* excp_str){
-    vga_print("Exception occurred: ");
-    vga_print(excp_str);
-    vga_print("\n\nSystem halted...\n");
+    vga_print32("Exception occurred: ");
+    vga_print32(excp_str);
+    vga_print32("\n\nSystem halted...\n");
     while(1){
         __asm__ __volatile__ ("hlt");
     }
@@ -75,7 +75,7 @@ void idt_install(struct idt_ptr* idt_ptr) {
 
 
 struct idt_ptr idt_init(void){
-    struct idt_entry* idt = kpgmalloc(1); // Allocate one page (4096 bytes) for IDT (even though its only 2048 bytes)
+    struct idt_entry* idt = kpgmalloc32(1); // Allocate one page (4096 bytes) for IDT (even though its only 2048 bytes)
     struct idt_ptr idt_pointer;
     idt_pointer.limit = (sizeof(struct idt_entry) * IDT_SIZE) - 1;
     idt_pointer.base = (uint32_t)idt;
@@ -120,7 +120,7 @@ struct idt_ptr idt_init(void){
 
     idt_install(&idt_pointer);
 
-    vga_print("IDT initialized and loaded.\n");
+    vga_print32("IDT initialized and loaded.\n");
     return idt_pointer;
 }
 

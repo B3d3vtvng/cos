@@ -5,7 +5,7 @@
 #include "alloc_init.h"
 #include "memutils.h"
 #include "paging.h"
-#include "../../kernel64/include/idt.h"
+#include "idt.h"
 #include <stdint.h>
 
 struct kern_data{

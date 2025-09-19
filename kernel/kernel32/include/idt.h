@@ -2,7 +2,7 @@
 #define __IDT_H__
 
 #include "vga_control.h"
-#include "alloc.h"
+#include "alloc_init.h"
 #include <stdint.h>
 #include "conversion.h"
 

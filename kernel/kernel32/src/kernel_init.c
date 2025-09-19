@@ -64,6 +64,7 @@ void __attribute__((noreturn)) kinit(void) {
     vga_print32("Reached kernel init, now enabling virtualization and 64-bit long mode...\n");
 
     kernel_dat.pml4 = init_paging(); // sets CR3, enables PAE
+    idt_init();
 
     enter_long_mode();
 

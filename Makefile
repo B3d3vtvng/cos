@@ -125,10 +125,10 @@ build/os.img: build/boot.bin build/stage2.bin build/kernel.bin | build
 # Run & Debug
 # =====================================
 run: build/os.img
-	qemu-system-i386 -fda $<
+	qemu-system-x86_64 -fda $<
 
 debug: build/os.img build/kernel64.elf build/kernel32.elf build/stage2.elf build/boot.elf
-	qemu-system-i386 -fda build/os.img -S -s &
+	qemu-system-x86_64 -fda build/os.img -S -s &
 	sleep 1
 	# Lade alle Symbole automatisch, keine Bestätigung nötig
 	$(eval GDB_CMDS := \
