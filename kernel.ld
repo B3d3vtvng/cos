@@ -3,7 +3,7 @@ SECTIONS
 {
     . = 0x2000;
     .text : {
-        *(.text.entry)
+        *(.text.stage3)
         *(.text)
     }
     .rodata : {

@@ -6,19 +6,47 @@ LD      = x86_64-elf-ld
 OBJCOPY = x86_64-elf-objcopy
 ASM     = nasm
 
-CFLAGS  = -m32 -ffreestanding -O0 -g
-LDFLAGS = -m elf_i386
+# Compiler and assembler flags
+CFLAGS32  = -m32 -ffreestanding -O0 -g -Wall -Wextra
+CFLAGS64  = -m64 -ffreestanding -O0 -g -Wall -Wextra -mcmodel=large -mno-red-zone
+LDFLAGS32 = -m elf_i386 --oformat=elf32-i386
+LDFLAGS64 = -m elf_x86_64 --oformat=elf64-x86-64
+ASMFLAGS32 = -f elf32
+ASMFLAGS64 = -f elf64
 ASMFLAGS_BIN = -f bin
-ASMFLAGS_ELF = -f elf32 -g -F dwarf
+
+# =====================================
+# Initial dummy sector counts
+# =====================================
+STAGE2_SECTORS_INIT  := 1
+STAGE3_SECTORS_INIT  := 1
+BOOT64_SECTORS_INIT  := 1
+KERNEL_SECTORS_INIT  := 1
 
 # =====================================
 # Sources & Objects
 # =====================================
-C_SRC := $(wildcard kernel/**/*.c kernel/*.c)
-ASM_SRC := $(wildcard kernel/**/*.s kernel/*.s)
+# Boot sources
+BOOT32_ASM := $(wildcard boot/boot32/*.s)
+BOOT32_C   := $(wildcard boot/boot32/*.c)
+BOOT64_ASM := $(wildcard boot/boot64/*.s)
+BOOT64_C   := $(wildcard boot/boot64/*.c)
 
-C_OBJ := $(patsubst kernel/%.c, build/%.o, $(C_SRC))
-ASM_OBJ := $(patsubst kernel/%.s, build/%.o, $(ASM_SRC))
+# Boot objects (output directly to build/)
+BOOT32_ASM_OBJ := $(patsubst boot/boot32/%.s, build/%.o, $(BOOT32_ASM))
+BOOT32_C_OBJ   := $(patsubst boot/boot32/%.c, build/%.o, $(BOOT32_C))
+BOOT64_ASM_OBJ := $(patsubst boot/boot64/%.s, build/%.o, $(BOOT64_ASM))
+BOOT64_C_OBJ   := $(patsubst boot/boot64/%.c, build/%.o, $(BOOT64_C))
+
+# Kernel sources
+C_SRC   := $(wildcard kernel/*.c)
+ASM_SRC := $(wildcard kernel/asm/*.s)
+
+# Kernel objects (output directly to build/)
+C_OBJ   := $(patsubst kernel/%.c, build/%.o, $(C_SRC))
+ASM_OBJ := $(patsubst kernel/asm/%.s, build/%.o, $(ASM_SRC))
+
+# All objects
 OBJ := $(C_OBJ) $(ASM_OBJ)
 
 # =====================================
@@ -32,71 +60,79 @@ build:
 # =====================================
 # Pattern Rules
 # =====================================
+# Simplified pattern rules that output directly to build/
 build/%.o: kernel/%.c | build
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS64) -c $< -o $@
 
-build/%.o: kernel/%.s | build
-	@mkdir -p $(dir $@)
-	$(ASM) $(ASMFLAGS_ELF) $< -o $@
+build/%.o: kernel/asm/%.s | build
+	$(ASM) $(ASMFLAGS64) $< -o $@
+
+build/%.o: boot/boot32/%.c | build
+	$(CC) $(CFLAGS32) -c $< -o $@
+
+build/%.o: boot/boot32/%.s | build
+	$(ASM) $(ASMFLAGS32) $< -o $@
+
+build/%.o: boot/boot64/%.c | build
+	$(CC) $(CFLAGS64) -c $< -o $@
+
+build/%.o: boot/boot64/%.s | build
+	$(ASM) $(ASMFLAGS64) $< -o $@
 
 # =====================================
-# Kernel
+# Kernel linking (with explicit objects)
 # =====================================
-build/kernel.elf: $(OBJ) kernel.ld
-	$(LD) $(LDFLAGS) -T kernel.ld $(OBJ) -o $@
+build/kernel.elf: $(OBJ) kernel.ld | build
+	$(LD) $(LDFLAGS64) -T kernel.ld $(OBJ) -o $@
 
 build/kernel.bin: build/kernel.elf
-	$(OBJCOPY) -O binary --change-section-lma .text.boot=0x2000 $< $@
+	$(OBJCOPY) -O binary $< $@
 
 # =====================================
 # Stage 2 loader
 # =====================================
-KERNEL_SECTORS = $(shell expr $$(stat -f%z build/kernel.bin) / 512 + 1)
-
-build/stage2_temp.bin: boot/stage2.s build/kernel.bin | build
-	$(ASM) $(ASMFLAGS_BIN) -DKERN_SEC_CNT=$(KERNEL_SECTORS) -DKERNEL_BASE=0x2000 -DST2_SEC_CNT=1 $< -o $@
-
-STAGE2_SECTORS = $(shell expr $$(stat -f%z build/stage2_temp.bin) / 512 + 1)
-
-build/stage2.bin build/stage2.elf: boot/stage2.s build/stage2_temp.bin build/kernel.bin | build
-	$(ASM) $(ASMFLAGS_BIN) -DKERN_SEC_CNT=$(KERNEL_SECTORS) -DKERNEL_BASE=0x2000 -DST2_SEC_CNT=$(STAGE2_SECTORS) $< -o build/stage2.bin
-	$(ASM) $(ASMFLAGS_ELF) -D__ELF__=true -DKERN_SEC_CNT=$(KERNEL_SECTORS) -DKERNEL_BASE=0x2000 -DST2_SEC_CNT=$(STAGE2_SECTORS) $< -o build/stage2.elf
-	rm build/stage2_temp.bin
+build/stage2.bin: boot/boot32/stage2.s | build
+	$(ASM) $(ASMFLAGS_BIN) \
+		-DST2_SEC_CNT=1 \
+		-DSTAGE3_SEC_CNT=1 \
+		-DKERN_SEC_CNT=1 \
+		-DSTAGE3_BASE=0x15000 \
+		-DKERNEL_BASE=0x20000 \
+		$< -o $@
 
 # =====================================
 # Boot sector
 # =====================================
-STAGE2_BIN_SECTORS = $(shell expr $$(stat -f%z build/stage2.bin) / 512 + 1)
+build/boot.bin: boot/boot32/boot_sec.s build/stage2.bin | build
+	$(ASM) $(ASMFLAGS_BIN) -DST2_SEC_CNT=1 $< -o $@
 
-build/boot.bin build/boot.elf: boot/boot_sec.s build/stage2.bin | build
-	$(ASM) $(ASMFLAGS_BIN) -DST2_SEC_CNT=$(STAGE2_BIN_SECTORS) $< -o build/boot.bin
-	$(ASM) $(ASMFLAGS_ELF) -D__ELF__=true -DST2_SEC_CNT=$(STAGE2_BIN_SECTORS) $< -o build/boot.elf
+# =====================================
+# Stage 3 loader
+# =====================================
+build/stage3.o : boot/boot32/stage3.c | build
+	$(CC) $(CFLAGS32) -c $< -o $@
+
+build/stage3.elf: build/enter_long_mode.o build/stage3.o $(ENTER_LONG_OBJ) | build
+	$(LD) $(LDFLAGS32) -Ttext=0x15000 -e stage3_main $^ -o $@
+
+build/stage3.bin: build/stage3.elf
+	$(OBJCOPY) -O binary $< $@
 
 # =====================================
 # Disk image
 # =====================================
-build/os.img: build/boot.bin build/stage2.bin build/kernel.bin | build
+build/os.img: build/boot.bin build/stage2.bin build/stage3.bin build/kernel.bin
 	dd if=/dev/zero of=$@ bs=512 count=2880
-	dd if=build/boot.bin of=$@ conv=notrunc,sync
-	dd if=build/stage2.bin of=$@ bs=512 seek=1 conv=notrunc,sync
-	dd if=build/kernel.bin of=$@ bs=512 \
-		seek=$$((1 + ( ($$(stat -f%z build/stage2.bin) + 511) / 512 ))) \
-		conv=notrunc,sync
+	dd if=build/boot.bin of=$@ conv=notrunc
+	dd if=build/stage2.bin of=$@ bs=512 seek=1 conv=notrunc
+	dd if=build/stage3.bin of=$@ bs=512 seek=2 conv=notrunc
+	dd if=build/kernel.bin of=$@ bs=512 seek=3 conv=notrunc
 
 # =====================================
-# Run & Debug
+# Run & clean
 # =====================================
 run: build/os.img
-	qemu-system-i386 -fda $<
-
-debug: build/os.img
-	qemu-system-i386 -fda $< -S -s &
-	sleep 1
-	gdb -ex "target remote localhost:1234" \
-	    -ex "add-symbol-file build/boot.elf 0x7c00" \
-	    -ex "add-symbol-file build/stage2.elf 0x1000" \
-	    -ex "add-symbol-file build/kernel.elf 0x2000"
+	qemu-system-x86_64 -fda $<
 
 clean:
 	rm -rf build

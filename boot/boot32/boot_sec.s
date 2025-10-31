@@ -1,4 +1,4 @@
-bits 16
+[bits 16]
 %ifndef __ELF__
     org 0x7C00                ; BIOS loads us here
 %endif
@@ -37,7 +37,9 @@ start:
     int 0x13
     jc .disk_fail       ; jump if error
 
-    jmp 0x0000:0x1000   ; jump to Stage 2 code
+    db 0xEA                ; opcode for JMP FAR imm16:imm16
+    dw 0x1000              ; offset
+    dw 0x0000              ; segment
 
 .disk_fail:
     mov si, disk_fail_msg

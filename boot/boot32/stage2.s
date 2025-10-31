@@ -36,16 +36,16 @@ start:
 ; Kernel starts immediately after stage2:
 ;   boot sector = sector 1
 ;   stage2      = sectors [2 .. 1 + ST2_SEC_CNT]
-;   kernel      = starts at (2 + ST2_SEC_CNT)
-load_kernel:
+;   stage3      = starts at (2 + ST2_SEC_CNT)
+load_stage3:
     ; Destination buffer = physical KERNEL_BASE
     ; Use ES:BX = 0x0000:KERNEL_BASE (works as long as KERNEL_BASE < 64K)
-    xor ax, ax
+    mov ax, 0x1500
     mov es, ax
-    mov bx, KERNEL_BASE
+    mov bx, 0x0000         ; ES:BX = 0x1500:0x0000 -> 0x15000
 
     mov ah, 0x02                 ; BIOS disk read
-    mov al, KERN_SEC_CNT         ; number of sectors to read
+    mov al, STAGE3_SEC_CNT         ; number of sectors to read
     mov ch, 0x00                 ; cylinder 0
     mov dh, 0x00                 ; head 0
     mov cl, (2 + ST2_SEC_CNT)    ; starting sector (1-based)
@@ -54,7 +54,7 @@ load_kernel:
     int 0x13
     jc  disk_fail                ; if CF set -> error
 
-    jmp load_bios_mmap          ; continue to load BIOS memory map
+    jmp load_kernel          
 
 disk_fail:
     mov si, disk_fail_msg
@@ -71,6 +71,22 @@ disk_fail:
     cli
     hlt
     jmp .halt
+
+load_kernel:
+    mov ax, 0x2000
+    mov es, ax
+    mov bx, 0x0000       ; ES:BX = 0x2000:0x0000 -> 0x2000 * 16 + 0 = 0x20000
+
+    mov ah, 0x02         ; BIOS: read sectors
+    mov al, KERN_SEC_CNT ; number of sectors
+    mov ch, 0           ; cylinder 0
+    mov dh, 0           ; head 0
+    mov cl, (2 + ST2_SEC_CNT + STAGE3_SEC_CNT) ; sector
+    mov dl, 0         ; drive (set by BIOS in DL)
+    int 0x13
+
+    jc disk_fail       ; jump if error
+    jmp load_bios_mmap
 
 load_bios_mmap:
     ; Get BIOS memory map via int 0x15, eax=0xE820
@@ -111,6 +127,10 @@ enter_prot_mode:
     or  eax, 1                   ; set PE bit
     mov cr0, eax
 
+    ; Set up stack for protected mode
+    mov esp, 0x15000
+    mov ebp, 0x15000
+
     ; Far jump to flush prefetch queue and load CS = code selector (0x08)
     jmp 0x08:pm_entry          ; jump to 32-bit code segment
 
@@ -128,7 +148,7 @@ pm_entry:
     mov esp, 0x9FC00             ; simple stack (just below 640 KiB)
 
     ; Jump to kernel entry (flat linear address)
-    mov eax, KERNEL_BASE           ; KERNEL_BASE
+    mov eax, 0x15000           ; KERNEL_BASE
     jmp eax                       ; transfer control to kernel
 
 
