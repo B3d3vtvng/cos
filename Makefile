@@ -31,7 +31,8 @@ BOOT_C   := $(wildcard boot/boot32/*.c)
 BOOT_ASM_OBJ := $(patsubst boot/boot32/%.s, build/%.o, $(BOOT32_ASM))
 BOOT_C_OBJ   := $(patsubst boot/boot32/%.c, build/%.o, $(BOOT32_C))
 
-C_SRC   := $(wildcard kernel/*.c)
+C_DRIVER_SRC   := $(wildcard kernel/drivers/*.c)
+C_SRC := kernel/kernel_main.c $(C_DRIVER_SRC)
 ASM_SRC := $(wildcard kernel/asm/*.s)
 
 C_OBJ   := $(patsubst kernel/%.c, build/%.o, $(C_SRC))
@@ -42,10 +43,11 @@ OBJ := $(C_OBJ) $(ASM_OBJ)
 # =====================================
 # Default target
 # =====================================
-all: build/os.img
+all: clean build/os.img
 
 build:
 	mkdir -p build
+	mkdir -p build/drivers
 
 # =====================================
 # Pattern Rules
@@ -78,14 +80,20 @@ build/stage2.elf: boot/stage2.s | build
 	$(ASM) $(ASMFLAGS32) \
 		-DST2_SEC_CNT=1 \
 		-DSTAGE3_SEC_CNT=2 \
-		-DKERN_SEC_CNT=1 \
+		-DKERN_SEC_CNT=4 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
 		-D__ELF__ \
 		$< -o $@ -g -F DWARF
 
 build/stage2.bin: build/stage2.elf
-	$(ASM) $(ASMFLAGS_BIN) -DST2_SEC_CNT=1 -DSTAGE3_SEC_CNT=2 -DSTAGE3_BASE=0x15000 -DKERNEL_BASE=0x20000 -DKERN_SEC_CNT=1 boot/stage2.s -o $@
+	$(ASM) $(ASMFLAGS_BIN) \
+		-DST2_SEC_CNT=1 \
+		-DSTAGE3_SEC_CNT=2 \
+		-DSTAGE3_BASE=0x15000 \
+		-DKERNEL_BASE=0x20000 \
+		-DKERN_SEC_CNT=4 \
+		boot/stage2.s -o $@
 
 # =====================================
 # Boot sector
@@ -102,7 +110,7 @@ build/boot.bin: boot/boot_sec.s build/stage2.bin | build
 build/stage3.o : boot/stage3.c | build
 	$(CC) $(CFLAGS32) -c $< -o $@
 
-build/stage3.elf: ld_scripts/stage3.ld build/enter_long_mode.o build/stage3.o | build
+build/stage3.elf: build/enter_long_mode.o build/stage3.o | build
 	$(LD) $(LDFLAGS32) -T ld_scripts/stage3.ld -e stage3_main $^ -o $@ -g
 
 build/stage3.bin: build/stage3.elf
