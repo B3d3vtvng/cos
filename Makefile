@@ -65,8 +65,8 @@ build/%.o: boot/%.s | build
 # =====================================
 # Kernel linking
 # =====================================
-build/kernel.elf: $(OBJ) kernel.ld | build
-	$(LD) $(LDFLAGS64) -T kernel.ld $(OBJ) -o $@
+build/kernel.elf: $(OBJ) ld_scripts/kernel.ld | build
+	$(LD) $(LDFLAGS64) -T ld_scripts/kernel.ld $(OBJ) -o $@
 
 build/kernel.bin: build/kernel.elf
 	$(OBJCOPY) -O binary $< $@
@@ -102,8 +102,8 @@ build/boot.bin: boot/boot_sec.s build/stage2.bin | build
 build/stage3.o : boot/stage3.c | build
 	$(CC) $(CFLAGS32) -c $< -o $@
 
-build/stage3.elf: build/enter_long_mode.o build/stage3.o | build
-	$(LD) $(LDFLAGS32) -T stage3.ld -e stage3_main $^ -o $@ -g
+build/stage3.elf: ld_scripts/stage3.ld build/enter_long_mode.o build/stage3.o | build
+	$(LD) $(LDFLAGS32) -T ld_scripts/stage3.ld -e stage3_main $^ -o $@ -g
 
 build/stage3.bin: build/stage3.elf
 	$(OBJCOPY) -O binary $< $@
