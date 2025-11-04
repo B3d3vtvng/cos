@@ -1,13 +1,12 @@
 [bits 32]
 
+%define PML4_ADDR 0x90000
+
 section .text
     global enter_long_mode
     extern gdt64_ptr
 ; -------- Switch to 64-bit long mode --------
 enter_long_mode:
-    sub esp, 8 ; Make space for pt
-    mov [esp], edi ; Save pt
-
     ; Load gdt
     lgdt [gdt64_ptr]
 
@@ -23,9 +22,19 @@ enter_long_mode:
     wrmsr
 
     ; Load page table address into cr3
-    mov eax, [esp]
+    mov eax, PML4_ADDR
     mov cr3, eax
-    add esp, 8 ; Restore rsp
+
+    mov esp, 0x19000 ; Set up stack for long mode
+    mov ebp, 0x19000 ; Set up base pointer for long mode
+
+    ; Load data/stack segments = data selector (0x10)
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    mov fs, ax
+    mov gs, ax
 
     ; Set cr0.PG
     mov eax, cr0
@@ -33,4 +42,4 @@ enter_long_mode:
     mov cr0, eax
 
     ; Far jump to flush prefetch queue and load CS = 64-bit code selector (0x20)
-    jmp 0x20:0x19000      ; jump to 64-bit code segment
+    jmp 0x08:0x20000      ; jump to 64-bit code segment

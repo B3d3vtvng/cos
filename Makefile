@@ -13,7 +13,6 @@ LDFLAGS32 = -m elf_i386 --oformat=elf32-i386
 LDFLAGS64 = -m elf_x86_64 --oformat=elf64-x86-64
 ASMFLAGS32 = -f elf32
 ASMFLAGS64 = -f elf64
-ASMFLAGS_BIN = -f bin
 
 # =====================================
 # Initial dummy sector counts
@@ -26,27 +25,18 @@ KERNEL_SECTORS_INIT  := 1
 # =====================================
 # Sources & Objects
 # =====================================
-# Boot sources
-BOOT32_ASM := $(wildcard boot/boot32/*.s)
-BOOT32_C   := $(wildcard boot/boot32/*.c)
-BOOT64_ASM := $(wildcard boot/boot64/*.s)
-BOOT64_C   := $(wildcard boot/boot64/*.c)
+BOOT_ASM := $(wildcard boot/boot32/*.s)
+BOOT_C   := $(wildcard boot/boot32/*.c)
 
-# Boot objects (output directly to build/)
-BOOT32_ASM_OBJ := $(patsubst boot/boot32/%.s, build/%.o, $(BOOT32_ASM))
-BOOT32_C_OBJ   := $(patsubst boot/boot32/%.c, build/%.o, $(BOOT32_C))
-BOOT64_ASM_OBJ := $(patsubst boot/boot64/%.s, build/%.o, $(BOOT64_ASM))
-BOOT64_C_OBJ   := $(patsubst boot/boot64/%.c, build/%.o, $(BOOT64_C))
+BOOT_ASM_OBJ := $(patsubst boot/boot32/%.s, build/%.o, $(BOOT32_ASM))
+BOOT_C_OBJ   := $(patsubst boot/boot32/%.c, build/%.o, $(BOOT32_C))
 
-# Kernel sources
 C_SRC   := $(wildcard kernel/*.c)
 ASM_SRC := $(wildcard kernel/asm/*.s)
 
-# Kernel objects (output directly to build/)
 C_OBJ   := $(patsubst kernel/%.c, build/%.o, $(C_SRC))
 ASM_OBJ := $(patsubst kernel/asm/%.s, build/%.o, $(ASM_SRC))
 
-# All objects
 OBJ := $(C_OBJ) $(ASM_OBJ)
 
 # =====================================
@@ -60,27 +50,20 @@ build:
 # =====================================
 # Pattern Rules
 # =====================================
-# Simplified pattern rules that output directly to build/
 build/%.o: kernel/%.c | build
 	$(CC) $(CFLAGS64) -c $< -o $@
 
 build/%.o: kernel/asm/%.s | build
 	$(ASM) $(ASMFLAGS64) $< -o $@
 
-build/%.o: boot/boot32/%.c | build
+build/%.o: boot/%.c | build
 	$(CC) $(CFLAGS32) -c $< -o $@
 
-build/%.o: boot/boot32/%.s | build
+build/%.o: boot/%.s | build
 	$(ASM) $(ASMFLAGS32) $< -o $@
 
-build/%.o: boot/boot64/%.c | build
-	$(CC) $(CFLAGS64) -c $< -o $@
-
-build/%.o: boot/boot64/%.s | build
-	$(ASM) $(ASMFLAGS64) $< -o $@
-
 # =====================================
-# Kernel linking (with explicit objects)
+# Kernel linking
 # =====================================
 build/kernel.elf: $(OBJ) kernel.ld | build
 	$(LD) $(LDFLAGS64) -T kernel.ld $(OBJ) -o $@
@@ -91,48 +74,99 @@ build/kernel.bin: build/kernel.elf
 # =====================================
 # Stage 2 loader
 # =====================================
-build/stage2.bin: boot/boot32/stage2.s | build
-	$(ASM) $(ASMFLAGS_BIN) \
+build/stage2.elf: boot/stage2.s | build
+	$(ASM) $(ASMFLAGS32) \
 		-DST2_SEC_CNT=1 \
-		-DSTAGE3_SEC_CNT=1 \
+		-DSTAGE3_SEC_CNT=2 \
 		-DKERN_SEC_CNT=1 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
-		$< -o $@
+		-D__ELF__ \
+		$< -o $@ -g -F DWARF
+
+build/stage2.bin: build/stage2.elf
+	$(ASM) $(ASMFLAGS_BIN) -DST2_SEC_CNT=1 -DSTAGE3_SEC_CNT=2 -DSTAGE3_BASE=0x15000 -DKERNEL_BASE=0x20000 -DKERN_SEC_CNT=1 boot/stage2.s -o $@
 
 # =====================================
 # Boot sector
 # =====================================
-build/boot.bin: boot/boot32/boot_sec.s build/stage2.bin | build
+build/boot.elf: boot/boot_sec.s build/stage2.bin | build
+	$(ASM) $(ASMFLAGS32) -DST2_SEC_CNT=1 -D__ELF__ $< -o $@ -g -F DWARF
+
+build/boot.bin: boot/boot_sec.s build/stage2.bin | build
 	$(ASM) $(ASMFLAGS_BIN) -DST2_SEC_CNT=1 $< -o $@
 
 # =====================================
 # Stage 3 loader
 # =====================================
-build/stage3.o : boot/boot32/stage3.c | build
+build/stage3.o : boot/stage3.c | build
 	$(CC) $(CFLAGS32) -c $< -o $@
 
-build/stage3.elf: build/enter_long_mode.o build/stage3.o $(ENTER_LONG_OBJ) | build
-	$(LD) $(LDFLAGS32) -Ttext=0x15000 -e stage3_main $^ -o $@
+build/stage3.elf: build/enter_long_mode.o build/stage3.o | build
+	$(LD) $(LDFLAGS32) -T stage3.ld -e stage3_main $^ -o $@ -g
 
 build/stage3.bin: build/stage3.elf
 	$(OBJCOPY) -O binary $< $@
 
 # =====================================
+# Sector calculations and reporting
+# =====================================
+define calc_sectors
+    $(shell expr $$(stat -f%z "$(1)") / 512 + 1)
+endef
+
+define calc_address
+    $(shell printf "0x%05x" $$(($(1) * 512)))
+endef
+
+# =====================================
 # Disk image
 # =====================================
 build/os.img: build/boot.bin build/stage2.bin build/stage3.bin build/kernel.bin
-	dd if=/dev/zero of=$@ bs=512 count=2880
-	dd if=build/boot.bin of=$@ conv=notrunc
-	dd if=build/stage2.bin of=$@ bs=512 seek=1 conv=notrunc
-	dd if=build/stage3.bin of=$@ bs=512 seek=2 conv=notrunc
-	dd if=build/kernel.bin of=$@ bs=512 seek=3 conv=notrunc
+	@echo "Creating disk image..."
+	@echo "----------------------------------------"	
+
+	$(eval BOOT_SECTORS := 1)
+	$(eval STAGE2_SECTORS := $(call calc_sectors,build/stage2.bin))
+	$(eval STAGE3_SECTORS := $(call calc_sectors,build/stage3.bin))
+	$(eval KERNEL_SECTORS := $(call calc_sectors,build/kernel.bin))
+
+	$(eval STAGE2_LBA := $(BOOT_SECTORS))
+	$(eval STAGE3_LBA := $(shell python3 -c "print($(BOOT_SECTORS) + $(STAGE2_SECTORS))"))
+	$(eval KERNEL_LBA := $(shell python3 -c "print($(BOOT_SECTORS) + $(STAGE2_SECTORS) + $(STAGE3_SECTORS))"))
+
+	@echo "Boot Sector      size: $$(stat -f%z build/boot.bin) bytes ($(BOOT_SECTORS) sectors) @ LBA 0 (0x00000)"
+	@echo "Stage 2         size: $$(stat -f%z build/stage2.bin) bytes ($(STAGE2_SECTORS) sectors) @ LBA $(STAGE2_LBA) ($(call calc_address,$(STAGE2_LBA)))"
+	@echo "Stage 3         size: $$(stat -f%z build/stage3.bin) bytes ($(STAGE3_SECTORS) sectors) @ LBA $(STAGE3_LBA) ($(call calc_address,$(STAGE3_LBA)))"
+	@echo "Kernel          size: $$(stat -f%z build/kernel.bin) bytes ($(KERNEL_SECTORS) sectors) @ LBA $(KERNEL_LBA) ($(call calc_address,$(KERNEL_LBA)))"
+
+	dd if=/dev/zero of=$@ bs=512 count=2880 2>/dev/null
+	dd if=build/boot.bin of=$@ conv=notrunc 2>/dev/null
+	dd if=build/stage2.bin of=$@ bs=512 seek=$(STAGE2_LBA) conv=notrunc 2>/dev/null
+	dd if=build/stage3.bin of=$@ bs=512 seek=$(STAGE3_LBA) conv=notrunc 2>/dev/null
+	dd if=build/kernel.bin of=$@ bs=512 seek=$(KERNEL_LBA) conv=notrunc 2>/dev/null
+
+	@echo "----------------------------------------"
+	@echo "Total sectors: $$(($(KERNEL_LBA) + $(KERNEL_SECTORS)))"
+	@echo "Disk image created: $@"
 
 # =====================================
 # Run & clean
 # =====================================
 run: build/os.img
 	qemu-system-x86_64 -fda $<
+
+debug: build/os.img build/kernel.elf build/stage3.elf build/stage2.elf build/boot.elf
+	qemu-system-x86_64 -fda build/os.img -S -s &
+	sleep 1
+	$(eval GDB_CMDS := \
+		-ex "target remote localhost:1234" \
+		-ex "add-symbol-file build/boot.elf 0x7c00" \
+		-ex "add-symbol-file build/stage2.elf 0x1000" \
+		-ex "add-symbol-file build/stage3.elf 0x15000" \
+		-ex "add-symbol-file build/kernel.elf 0x20000" \
+	)
+	gdb $(GDB_CMDS) --tui
 
 clean:
 	rm -rf build

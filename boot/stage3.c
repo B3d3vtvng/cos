@@ -31,7 +31,7 @@ void gdt_set_entry(int idx, uint32_t base, uint32_t limit,
     gdt64[idx].base_high    = (base >> 24) & 0xFF;
 }
 
-void init_gdt64() {
+void init_gdt64(void) {
     // Null descriptor
     gdt_set_entry(0, 0, 0, 0, 0);
 
@@ -56,12 +56,12 @@ struct pagetable {
     pte_t entries[ENTRIES_PER_TABLE];
 };
 
-struct pagetable* load_paging(void){
+void load_paging(void){
     //Allocate pagetables
-    struct pagetable* pml4 = (void*)0x15000;
-    struct pagetable* pdpt = (void*)0x16000;
-    struct pagetable* pd = (void*)0x17000;
-    struct pagetable* pt = (void*)0x18000;
+    struct pagetable* pml4 = (void*)0x90000;
+    struct pagetable* pdpt = (void*)0x91000;
+    struct pagetable* pd = (void*)0x92000;
+    struct pagetable* pt = (void*)0x93000;
 
     //Initialize tables to 0
     for (int i = 0; i < ENTRIES_PER_TABLE; i++){
@@ -79,16 +79,14 @@ struct pagetable* load_paging(void){
     pd->entries[0] = ((uint64_t) pt) | P_PRESENT | P_WRITABLE;
     pdpt->entries[0] = ((uint64_t) pd) | P_PRESENT | P_WRITABLE;
     pml4->entries[0] = ((uint64_t) pdpt) | P_PRESENT | P_WRITABLE;
-
-    return pml4;
 }
 
-__attribute__((noreturn)) void enter_long_mode(struct pagetable* pml4);
+__attribute__((noreturn)) void enter_long_mode(void);
 
-void __attribute__((noreturn)) __attribute__((section(".text.stage3"))) state3_main(void) {
+void __attribute__((noreturn)) __attribute__((section(".text.stage3"))) stage3_main(void) {
     init_gdt64();
-    struct pagetable* pt = load_paging();
-    enter_long_mode(pt);
+    load_paging();
+    enter_long_mode();
 
     while (1) {
         __asm__ __volatile__ (

@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-__attribute__((noreturn)) __attribute__((section(".text.kern_main"))) void kernel_main(void) {
+__attribute__((noreturn)) __attribute__((section(".text.kern_entry"))) void kernel_main(void) {
     volatile uint16_t* vga = (uint16_t*)0xB8000;
     const char* msg = "Hello from kernel main!";
     

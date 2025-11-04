@@ -1,9 +1,9 @@
-ENTRY(kernel_main)
+ENTRY(stage3_main)
 SECTIONS
 {
-    . = 0x20000;
+    . = 0x15000;
     .text : {
-        *(.text.kern_entry)
+        *(.text.stage3)
         *(.text)
     }
     .rodata : {
@@ -16,3 +16,4 @@ SECTIONS
         *(.bss)
     }
 }
+

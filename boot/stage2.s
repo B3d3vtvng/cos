@@ -25,7 +25,7 @@ start:
 .putc:
     lodsb                   ; AL = [SI], SI++
     test al, al
-    jz   load_kernel
+    jz   load_stage3
     mov ah, 0x0E            ; teletype output
     mov bh, 0x00            ; page
     mov bl, 0x07            ; light gray on black
@@ -128,8 +128,8 @@ enter_prot_mode:
     mov cr0, eax
 
     ; Set up stack for protected mode
-    mov esp, 0x15000
-    mov ebp, 0x15000
+    mov esp, 0x14FF0
+    mov ebp, 0x14FF0
 
     ; Far jump to flush prefetch queue and load CS = code selector (0x08)
     jmp 0x08:pm_entry          ; jump to 32-bit code segment
@@ -144,8 +144,6 @@ pm_entry:
     mov ss, ax
     mov fs, ax
     mov gs, ax
-
-    mov esp, 0x9FC00             ; simple stack (just below 640 KiB)
 
     ; Jump to kernel entry (flat linear address)
     mov eax, 0x15000           ; KERNEL_BASE
