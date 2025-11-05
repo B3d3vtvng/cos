@@ -16,6 +16,7 @@ isr%1:
 %endmacro
 
 section .text
+    extern isr_common_handler
 
 ISR_NOERR 0
 ISR_NOERR 1
@@ -32,6 +33,7 @@ ISR_ERR 11
 ISR_ERR 12
 ISR_ERR 13
 ISR_ERR 14
+ISR_ERR 15
 ISR_NOERR 16
 ISR_ERR 17
 ISR_NOERR 18
@@ -41,6 +43,7 @@ ISR_ERR 21
 
 isr_common_stub:
     ; Save general purpose registers
+    cli
     push rax
     push rbx
     push rcx
@@ -82,10 +85,12 @@ isr_common_stub:
     iretq
 
 section .data
+    global isr_stub_table
+
 isr_stub_table:
     %assign i 0
-    %rep 32
-        dq isr%i
+    %rep 21
+        dq isr%+i
         %assign i i+1
     %endrep
 

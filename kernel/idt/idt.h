@@ -2,7 +2,9 @@
 #define IDT_H
 
 #include <stdint.h>
-#include "../kernel.h"
+#include "../mem/pmmalloc.h"
+#include "../util/conversion.h"
+#include "../util/string.h"
 
 struct idt_entry {
     uint16_t offset_low;    // Bits 0-15 of handler function address
@@ -19,6 +21,16 @@ struct idt_ptr {
     uint64_t base;
 } __attribute__((packed));
 
-void idt_init(void);
+typedef struct excp_frame {
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
+    uint64_t int_no, err_code;
+    uint64_t rip, cs, rflags;
+    // rsp and ss only if privilege level change (user → kernel)
+    uint64_t rsp, ss;
+} excp_frame_t;
+
+struct idt_ptr idt_init(void);
+void __attribute__((noreturn)) kernel_panic(struct excp_frame* register_state, const char* message);
 
 #endif

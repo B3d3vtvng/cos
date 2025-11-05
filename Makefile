@@ -32,11 +32,15 @@ BOOT_ASM_OBJ := $(patsubst boot/boot32/%.s, build/%.o, $(BOOT32_ASM))
 BOOT_C_OBJ   := $(patsubst boot/boot32/%.c, build/%.o, $(BOOT32_C))
 
 C_DRIVER_SRC   := $(wildcard kernel/drivers/*.c)
-C_SRC := kernel/kernel_main.c $(C_DRIVER_SRC)
-ASM_SRC := $(wildcard kernel/asm/*.s)
+C_MEM_SRC	  := $(wildcard kernel/mem/*.c)
+C_IDT_SRC	  := $(wildcard kernel/idt/*.c)
+C_UTIL_SRC	  := $(wildcard kernel/util/*.c)
+C_SRC := kernel/kernel_main.c $(C_DRIVER_SRC) $(C_MEM_SRC) $(C_IDT_SRC) $(C_UTIL_SRC)
+
+ASM_SRC := $(wildcard kernel/**/*.s)
 
 C_OBJ   := $(patsubst kernel/%.c, build/%.o, $(C_SRC))
-ASM_OBJ := $(patsubst kernel/asm/%.s, build/%.o, $(ASM_SRC))
+ASM_OBJ := $(patsubst kernel/%.s, build/%.o, $(ASM_SRC))
 
 OBJ := $(C_OBJ) $(ASM_OBJ)
 
@@ -48,6 +52,9 @@ all: clean build/os.img
 build:
 	mkdir -p build
 	mkdir -p build/drivers
+	mkdir -p build/mem
+	mkdir -p build/idt
+	mkdir -p build/util
 
 # =====================================
 # Pattern Rules
@@ -55,7 +62,7 @@ build:
 build/%.o: kernel/%.c | build
 	$(CC) $(CFLAGS64) -c $< -o $@
 
-build/%.o: kernel/asm/%.s | build
+build/%.o: kernel/%.s | build
 	$(ASM) $(ASMFLAGS64) $< -o $@
 
 build/%.o: boot/%.c | build
@@ -80,7 +87,7 @@ build/stage2.elf: boot/stage2.s | build
 	$(ASM) $(ASMFLAGS32) \
 		-DST2_SEC_CNT=1 \
 		-DSTAGE3_SEC_CNT=2 \
-		-DKERN_SEC_CNT=4 \
+		-DKERN_SEC_CNT=20 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
 		-D__ELF__ \
@@ -92,7 +99,7 @@ build/stage2.bin: build/stage2.elf
 		-DSTAGE3_SEC_CNT=2 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
-		-DKERN_SEC_CNT=4 \
+		-DKERN_SEC_CNT=20 \
 		boot/stage2.s -o $@
 
 # =====================================
