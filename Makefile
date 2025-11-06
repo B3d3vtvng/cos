@@ -35,7 +35,8 @@ C_DRIVER_SRC   := $(wildcard kernel/drivers/*.c)
 C_MEM_SRC	  := $(wildcard kernel/mem/*.c)
 C_IDT_SRC	  := $(wildcard kernel/idt/*.c)
 C_UTIL_SRC	  := $(wildcard kernel/util/*.c)
-C_SRC := kernel/kernel_main.c $(C_DRIVER_SRC) $(C_MEM_SRC) $(C_IDT_SRC) $(C_UTIL_SRC)
+C_SCHED_SRC := $(wildcard kernel/sched/*.c)
+C_SRC := kernel/kernel_main.c $(C_DRIVER_SRC) $(C_MEM_SRC) $(C_IDT_SRC) $(C_UTIL_SRC) $(C_SCHED_SRC)
 
 ASM_SRC := $(wildcard kernel/**/*.s)
 
@@ -55,6 +56,7 @@ build:
 	mkdir -p build/mem
 	mkdir -p build/idt
 	mkdir -p build/util
+	mkdir -p build/sched
 
 # =====================================
 # Pattern Rules
@@ -87,7 +89,7 @@ build/stage2.elf: boot/stage2.s | build
 	$(ASM) $(ASMFLAGS32) \
 		-DST2_SEC_CNT=1 \
 		-DSTAGE3_SEC_CNT=2 \
-		-DKERN_SEC_CNT=20 \
+		-DKERN_SEC_CNT=27 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
 		-D__ELF__ \
@@ -99,7 +101,7 @@ build/stage2.bin: build/stage2.elf
 		-DSTAGE3_SEC_CNT=2 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
-		-DKERN_SEC_CNT=20 \
+		-DKERN_SEC_CNT=27 \
 		boot/stage2.s -o $@
 
 # =====================================

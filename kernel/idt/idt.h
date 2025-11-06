@@ -2,7 +2,7 @@
 #define IDT_H
 
 #include <stdint.h>
-#include "../mem/pmmalloc.h"
+#include "../mem/kmalloc.h"
 #include "../util/conversion.h"
 #include "../util/string.h"
 

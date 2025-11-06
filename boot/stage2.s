@@ -1,6 +1,3 @@
-; ; =========================
-; Stage 2 loader (NASM)
-; =========================
 ; Expected setup by Stage 1:
 ;   - Stage 2 is read to physical 0x1000
 ;   - Jumped via   jmp 0x0000:0x1000
@@ -32,14 +29,13 @@ start:
     int 0x10
     jmp .putc
 
-; -------- Load kernel (BIOS int 13h, CHS simple case) --------
 ; Kernel starts immediately after stage2:
 ;   boot sector = sector 1
 ;   stage2      = sectors [2 .. 1 + ST2_SEC_CNT]
 ;   stage3      = starts at (2 + ST2_SEC_CNT)
 load_stage3:
     ; Destination buffer = physical KERNEL_BASE
-    ; Use ES:BX = 0x0000:KERNEL_BASE (works as long as KERNEL_BASE < 64K)
+    ; Use ES:BX = 0x1500:0000
     mov ax, 0x1500
     mov es, ax
     mov bx, 0x0000         ; ES:BX = 0x1500:0x0000 -> 0x15000
@@ -90,8 +86,8 @@ load_kernel:
 
 load_bios_mmap:
     ; Get BIOS memory map via int 0x15, eax=0xE820
-    ; Store entries starting at 0x9004, max 20 bytes each
-    ; Store number of entries at 0x9000
+    ; Store entries starting at 0x7504, max 20 bytes each
+    ; Store number of entries at 0x7500
     mov ax, 0
     mov es, ax
     mov di, 0x7504              ; buffer starts here

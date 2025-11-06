@@ -4,6 +4,9 @@
         "conversion.h": "c",
         "stdint.h": "c",
         "pmmalloc.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "spinlock.h": "c",
+        "stdio.h": "c",
+        "kmalloc.h": "c"
     }
 }

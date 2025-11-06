@@ -1,7 +1,7 @@
 #include "pmmalloc.h"
 
 static struct bios_mmap_entry usable_entries[64];
-static struct alloc_metadata alloc_meta;
+struct alloc_metadata alloc_meta;
 
 void* pmmalloc(unsigned long count){
     if (count == 0 || count > KPG_MALLOC_MAX) {
@@ -98,6 +98,6 @@ void init_pmm(void) {
     }
     alloc_meta.alloc_entry_count = round_page_down(total_mem) / PAGE_SZ / 8; // Each entry is 1 byte
 
-    vga_print("Initialized memory allocator");
+    vga_print("Initialized memory allocator\n");
     return;
 }

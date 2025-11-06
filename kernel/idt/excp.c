@@ -41,7 +41,7 @@ void idt_set_gate(struct idt_entry* idt_entries, int n, uint64_t handler, uint16
 }
 
 struct idt_ptr idt_init(void){
-    void* idt_entries = pmmalloc(ROUND_PG(sizeof(struct idt_entry) * 256));
+    void* idt_entries = kmalloc(sizeof(struct idt_entry) * 256);
     // Set up IDT entries for CPU exceptions (0-31)
     for (int i = 0; i < 32; i++) {
         idt_set_gate(idt_entries, i, (uint64_t)isr_stub_table[i], 0x08, 0x8E);

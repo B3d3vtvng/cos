@@ -5,6 +5,7 @@
 section .text
     global enter_long_mode
     extern gdt64_ptr
+
 ; -------- Switch to 64-bit long mode --------
 enter_long_mode:
     ; Load gdt
@@ -41,5 +42,5 @@ enter_long_mode:
     or  eax, 1 << 31              ; set PG bit
     mov cr0, eax
 
-    ; Far jump to flush prefetch queue and load CS = 64-bit code selector (0x20)
+    ; Far jump to flush prefetch queue and load CS = 64-bit code selector (0x08)
     jmp 0x08:0x20000      ; jump to 64-bit code segment

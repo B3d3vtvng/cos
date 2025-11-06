@@ -11,7 +11,6 @@
 #define ALLOC_ENTRY_BASE ((void*)0x10000)
 #define PAGE_SZ 0x1000ULL
 #define KPG_MALLOC_MAX 128
-#define KERNEL_STACK_PG_COUNT 5
 
 struct bios_mmap_entry {
     uint64_t base_addr;
