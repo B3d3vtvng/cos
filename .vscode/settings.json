@@ -7,6 +7,9 @@
         "string.h": "c",
         "spinlock.h": "c",
         "stdio.h": "c",
-        "kmalloc.h": "c"
+        "kmalloc.h": "c",
+        "stddef.h": "c",
+        "kernel.h": "c",
+        "paging.h": "c"
     }
 }

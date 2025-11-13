@@ -1,6 +1,6 @@
 [bits 32]
 
-%define PML4_ADDR 0x90000
+%define PML4_ADDR 0x100000
 
 section .text
     global enter_long_mode
@@ -26,9 +26,6 @@ enter_long_mode:
     mov eax, PML4_ADDR
     mov cr3, eax
 
-    mov esp, 0x19000 ; Set up stack for long mode
-    mov ebp, 0x19000 ; Set up base pointer for long mode
-
     ; Load data/stack segments = data selector (0x10)
     mov ax, 0x10
     mov ds, ax
@@ -43,4 +40,14 @@ enter_long_mode:
     mov cr0, eax
 
     ; Far jump to flush prefetch queue and load CS = 64-bit code selector (0x08)
-    jmp 0x08:0x20000      ; jump to 64-bit code segment
+    ; We have to jump to an intermediate routine as we cant use 64-bit jmp addresses yet
+    jmp 0x08:lm_entry
+
+
+[bits 64]
+lm_entry:
+    mov rsp, 0x19000
+    mov rbp, rsp
+
+    mov rax, 0xFFFFFFFF80000000    ; jump to kernel_entry
+    jmp rax

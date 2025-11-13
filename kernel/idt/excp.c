@@ -24,7 +24,7 @@ const char* excp_msg_map[] = {
     "Machine Check",
     "SIMD Floating-Point Exception",
     "Virtualization Exception",
-    "Control Protection Exception",
+    "Control Protection Exception"
 };
 
 extern void* isr_stub_table[];
@@ -50,7 +50,7 @@ struct idt_ptr idt_init(void){
     idt_pointer.limit = (uint16_t)(sizeof(struct idt_entry) * 256 - 1);
     idt_pointer.base = (uint64_t)idt_entries;
 
-    __asm__ volatile ("lidt %0" : : "m"(idt_pointer));
+    __asm__ __volatile__ ("lidt %0" : : "m"(idt_pointer));
     return idt_pointer;
 }
 
@@ -66,6 +66,12 @@ void kernel_panic(struct excp_frame* register_state, const char* message) {
     vga_clear();
     vga_print("KERNEL PANIC\n");
     vga_print(message);
+
+    if (register_state == NULL){
+        vga_print("System halted");
+        while (1) __asm__ __volatile__ ("hlt");
+    }
+
     vga_print("\n\nCore dump:\n\n");
 
     char buffer[32];
@@ -102,7 +108,6 @@ void kernel_panic(struct excp_frame* register_state, const char* message) {
 
     vga_print("\nSystem halted.\n");
 
-    while (1)
-        __asm__ volatile ("hlt");
+    while (1) __asm__ volatile ("hlt");
 }
 

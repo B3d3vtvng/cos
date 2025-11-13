@@ -3,12 +3,12 @@
 struct kernel_metadata kernel_meta;
 
 __attribute__((noreturn)) __attribute__((section(".text.kern_entry"))) void kernel_main(void) {
-    //Save the hardcoded pagetable address int our kernel metadata struct
+    //Save the hardcoded pagetable address in our kernel metadata struct
     kernel_meta.pagetable_address = PAGETABLE_ADDRESS;
 
     //Clear the screen and print a message
     vga_clear();
-    vga_print("Welcome to COS Kernel!\n");
+    vga_print("Welcome to COS Kernel!\n\n");
 
     // Initialize physical memory manager
     init_pmm();
@@ -21,7 +21,7 @@ __attribute__((noreturn)) __attribute__((section(".text.kern_entry"))) void kern
 
     // Initialize a primitive interrupt descriptor table to manage hardware exceptions (Simply panics in this state)
     kernel_meta.idt_ptr = idt_init();
-    vga_print("IDT initialized.\n");
+    vga_print("Initialized idt\n");
 
     // Initialize virtual memory allocator, remap kernel and neccessary kernel ram to high memory (0xFFFF800000000000), map everything else to low memory (0x0+)
     //init_vmm(kernel_meta);
@@ -29,7 +29,7 @@ __attribute__((noreturn)) __attribute__((section(".text.kern_entry"))) void kern
     //init_syscalls();
     //init_sched();
 
-    //ched_start();
+    //sched_start();
 
     while (1){
         __asm__ __volatile__("hlt");

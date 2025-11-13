@@ -1,8 +1,12 @@
 #ifndef VMMALLOC_H
 #define VMMALLOC_H
 
-#define KERN_BASE_VADDR 0xFFFF800000000000ULL
-#define USER_BASE_VADDR 0x0000000000000000ULL
+#define ENTRIES_PER_TABLE 512
+#define P_PRESENT (1ULL << 0)
+#define P_WRITABLE (1ULL << 1)
+#define P_USER (1ULL << 2)
+#define P_KERNEL (0 << 2)
+#define P_NX_ENABLE (1ULL << 63)
 
 #include "../kernel.h"
 #include "pmmalloc.h"

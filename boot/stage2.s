@@ -29,12 +29,8 @@ start:
     int 0x10
     jmp .putc
 
-; Kernel starts immediately after stage2:
-;   boot sector = sector 1
-;   stage2      = sectors [2 .. 1 + ST2_SEC_CNT]
-;   stage3      = starts at (2 + ST2_SEC_CNT)
 load_stage3:
-    ; Destination buffer = physical KERNEL_BASE
+    ; Destination buffer = physical STAGE3_BASE
     ; Use ES:BX = 0x1500:0000
     mov ax, 0x1500
     mov es, ax
@@ -110,7 +106,7 @@ load_bios_mmap:
     jnz .next_entry
 
 .done:
-    mov [0x7500], esi           ; store entry count at 0x9000
+    mov [0x7500], esi           ; store entry count at 0x7500
     jmp enter_prot_mode
 
 
@@ -141,9 +137,9 @@ pm_entry:
     mov fs, ax
     mov gs, ax
 
-    ; Jump to kernel entry (flat linear address)
-    mov eax, 0x15000           ; KERNEL_BASE
-    jmp eax                       ; transfer control to kernel
+    ; Jump to stage3 entry (flat linear address)
+    mov eax, 0x15000
+    jmp eax                       ; transfer control to stage 3
 
 
 

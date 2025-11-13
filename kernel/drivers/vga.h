@@ -6,8 +6,8 @@
 #define CURSOR_CMD_PORT 0x3D4
 #define CURSOR_DATA_PORT 0x3D5
 
-void vga_print(const char* str);
+void vga_putc(char);
+void vga_print(const char*);
 void vga_clear(void);
-
 
 #endif

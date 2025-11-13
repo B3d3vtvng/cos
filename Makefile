@@ -7,7 +7,7 @@ OBJCOPY = x86_64-elf-objcopy
 ASM     = nasm
 
 # Compiler and assembler flags
-CFLAGS32  = -m32 -ffreestanding -O0 -g -Wall -Wextra
+CFLAGS32  = -m32 -ffreestanding -O0 -g -Wall -Wextra -Wno-pointer-to-int-cast
 CFLAGS64  = -m64 -ffreestanding -O0 -g -Wall -Wextra -mcmodel=large -mno-red-zone
 LDFLAGS32 = -m elf_i386 --oformat=elf32-i386
 LDFLAGS64 = -m elf_x86_64 --oformat=elf64-x86-64
@@ -89,7 +89,7 @@ build/stage2.elf: boot/stage2.s | build
 	$(ASM) $(ASMFLAGS32) \
 		-DST2_SEC_CNT=1 \
 		-DSTAGE3_SEC_CNT=2 \
-		-DKERN_SEC_CNT=27 \
+		-DKERN_SEC_CNT=57 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
 		-D__ELF__ \
@@ -101,7 +101,7 @@ build/stage2.bin: build/stage2.elf
 		-DSTAGE3_SEC_CNT=2 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
-		-DKERN_SEC_CNT=27 \
+		-DKERN_SEC_CNT=57 \
 		boot/stage2.s -o $@
 
 # =====================================
@@ -117,7 +117,7 @@ build/boot.bin: boot/boot_sec.s build/stage2.bin | build
 # Stage 3 loader
 # =====================================
 build/stage3.o : boot/stage3.c | build
-	$(CC) $(CFLAGS32) -c $< -o $@
+	$(CC) $(CFLAGS32) -DKERNEL_PG_CNT=10 -c $< -o $@
 
 build/stage3.elf: build/enter_long_mode.o build/stage3.o | build
 	$(LD) $(LDFLAGS32) -T ld_scripts/stage3.ld -e stage3_main $^ -o $@ -g
@@ -181,7 +181,7 @@ debug: build/os.img build/kernel.elf build/stage3.elf build/stage2.elf build/boo
 		-ex "add-symbol-file build/boot.elf 0x7c00" \
 		-ex "add-symbol-file build/stage2.elf 0x1000" \
 		-ex "add-symbol-file build/stage3.elf 0x15000" \
-		-ex "add-symbol-file build/kernel.elf 0x20000" \
+		-ex "add-symbol-file build/kernel.elf 0xFFFFFFFF80000000" \
 	)
 	gdb $(GDB_CMDS) --tui
 

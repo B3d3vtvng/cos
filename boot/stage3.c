@@ -1,4 +1,9 @@
 #include <stdint.h>
+#include <stddef.h>
+
+#define KERNEL_BASE 0x20000
+#define KERNEL_RAM_IDENTITY_BASE 0xFFFF800000000000ULL
+#define KERNEL_VIRT_BASE 0xFFFFFFFF80000000ULL
 
 //###########################
 // GDT Setup
@@ -50,35 +55,77 @@ void init_gdt64(void) {
 #define P_WRITABLE (1ULL << 1)
 #define P_USER (1ULL << 2)
 
+struct bios_mmap_entry {
+    uint64_t base_addr;
+    uint64_t length;
+    uint32_t type;
+} __attribute__((packed));
+
 typedef uint64_t pte_t;
 
 struct pagetable {
     pte_t entries[ENTRIES_PER_TABLE];
 };
 
-void load_paging(void){
-    //Allocate pagetables
-    struct pagetable* pml4 = (void*)0x90000;
-    struct pagetable* pdpt = (void*)0x91000;
-    struct pagetable* pd = (void*)0x92000;
-    struct pagetable* pt = (void*)0x93000;
+#define PD_BASE_INDEX 0
+#define PDP_BASE_INDEX 510
+#define PML4_BASE_INDEX 511
 
-    //Initialize tables to 0
-    for (int i = 0; i < ENTRIES_PER_TABLE; i++){
+static inline struct pagetable* alloc_table(uintptr_t* next_addr, int* pt_count){
+    struct pagetable *tbl = (struct pagetable*) *next_addr;
+    *next_addr += 0x1000;
+    (*pt_count)++;
+    return tbl;
+}
+
+void load_paging(void) {
+    int *pt_count = (int*)(uintptr_t)0x74FB;
+    *pt_count = 0;
+
+    uintptr_t pagetable_next_addr = 0x100000; /* PML4 start (physical) */
+
+    struct pagetable *pml4  = alloc_table(&pagetable_next_addr, pt_count);
+    struct pagetable *kpdpt = alloc_table(&pagetable_next_addr, pt_count);
+    struct pagetable *kpd   = alloc_table(&pagetable_next_addr, pt_count);
+    struct pagetable *kpt   = alloc_table(&pagetable_next_addr, pt_count);
+
+    struct pagetable *ipdpt = alloc_table(&pagetable_next_addr, pt_count);
+    struct pagetable *ipd   = alloc_table(&pagetable_next_addr, pt_count);
+    struct pagetable *ipt   = alloc_table(&pagetable_next_addr, pt_count);
+
+    /* zero tables */
+    for (int i = 0; i < ENTRIES_PER_TABLE; ++i) {
         pml4->entries[i] = 0;
-        pdpt->entries[i] = 0;
-        pd->entries[i] = 0;
-        pt->entries[i] = 0;
+        kpdpt->entries[i] = 0;
+        kpd->entries[i] = 0;
+        kpt->entries[i] = 0;
+        ipdpt->entries[i] = 0;
+        ipd->entries[i] = 0;
+        ipt->entries[i] = 0;
     }
 
-    //Identity map first MiB
-    for (int i = 0; i < 256; i++){
-        pt->entries[i] = (i * 0x1000) | P_PRESENT | P_WRITABLE;
+    /* Identity-map first 2 MiB (1 PD -> 512 PT entries * 4KiB = 2MiB) */
+    for (int i = 0; i < ENTRIES_PER_TABLE; ++i) {
+        pte_t phys = (pte_t)((uintptr_t)i * 0x1000);
+        ipt->entries[i] = phys | P_PRESENT | P_WRITABLE;
     }
 
-    pd->entries[0] = ((uint64_t) pt) | P_PRESENT | P_WRITABLE;
-    pdpt->entries[0] = ((uint64_t) pd) | P_PRESENT | P_WRITABLE;
-    pml4->entries[0] = ((uint64_t) pdpt) | P_PRESENT | P_WRITABLE;
+    ipd->entries[0]   = ((pte_t)(uintptr_t)ipt & ~0xFFFULL) | P_PRESENT | P_WRITABLE;
+    ipdpt->entries[0] = ((pte_t)(uintptr_t)ipd & ~0xFFFULL) | P_PRESENT | P_WRITABLE;
+    pml4->entries[0]  = ((pte_t)(uintptr_t)ipdpt & ~0xFFFULL) | P_PRESENT | P_WRITABLE;
+
+    /* Map kernel physical pages (KERNEL_BASE) into high-half virtual at
+       PML4[511]->PDPT[256]->PD[0]->PT */
+    for (int i = 0; i < KERNEL_PG_CNT; ++i) {
+        pte_t phys = (pte_t)(KERNEL_BASE + (uintptr_t)i * 0x1000);
+        kpt->entries[i] = (phys & ~0xFFFULL) | P_PRESENT | P_WRITABLE;
+    }
+
+    kpd->entries[PD_BASE_INDEX]   = ((pte_t)(uintptr_t)kpt & ~0xFFFULL) | P_PRESENT | P_WRITABLE;
+    kpdpt->entries[PDP_BASE_INDEX]= ((pte_t)(uintptr_t)kpd & ~0xFFFULL) | P_PRESENT | P_WRITABLE;
+    pml4->entries[PML4_BASE_INDEX]= ((pte_t)(uintptr_t)kpdpt & ~0xFFFULL) | P_PRESENT | P_WRITABLE;
+
+    /* done — assembly expects the PML4 at 0x100000 (cr3 will be loaded with that) */
 }
 
 __attribute__((noreturn)) void enter_long_mode(void);
