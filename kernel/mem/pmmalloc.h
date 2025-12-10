@@ -36,6 +36,8 @@ struct alloc_metadata {
 void init_pmm(void);
 void* pmmalloc(unsigned long count);
 void pmmfree(void* ptr);
-uint64_t get_page_addr(uint64_t);
+uint64_t round_page_down(uint64_t);
+uint64_t round_page_up(uint64_t);
+uint64_t get_mem_max(void);
 
 #endif // PMMALLOC_H

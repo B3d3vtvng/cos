@@ -2,13 +2,8 @@
 #include <stddef.h>
 
 #define KERNEL_BASE 0x20000
-#define KERNEL_RAM_IDENTITY_BASE 0xFFFF800000000000ULL
-#define KERNEL_VIRT_BASE 0xFFFFFFFF80000000ULL
 
-//###########################
-// GDT Setup
-//###########################
-
+// An entry into the global descriptor table (GDT)
 struct gdt_entry {
     uint16_t limit_low;     // Bits 0-15 of limit
     uint16_t base_low;      // Bits 0-15 of base
@@ -18,6 +13,7 @@ struct gdt_entry {
     uint8_t  base_high;     // Bits 24-31 of base
 } __attribute__((packed));
 
+// Pointer to the GDT
 struct gdt_ptr {
     uint16_t limit;
     uint64_t base;          // 64-bit base for lgdt
@@ -27,7 +23,7 @@ struct gdt_entry gdt64[3];
 struct gdt_ptr gdt64_ptr;
 
 void gdt_set_entry(int idx, uint32_t base, uint32_t limit,
-                   uint8_t access, uint8_t gran) {
+                   uint8_t access, uint8_t gran){
     gdt64[idx].limit_low    = (limit & 0xFFFF);
     gdt64[idx].base_low     = (base & 0xFFFF);
     gdt64[idx].base_middle  = (base >> 16) & 0xFF;
@@ -55,14 +51,17 @@ void init_gdt64(void) {
 #define P_WRITABLE (1ULL << 1)
 #define P_USER (1ULL << 2)
 
+// An entry in the BIOS memory map
 struct bios_mmap_entry {
     uint64_t base_addr;
     uint64_t length;
     uint32_t type;
 } __attribute__((packed));
 
+// A page table entry (PTE)
 typedef uint64_t pte_t;
 
+// The pagetable struct, representing a page table with 512 entries
 struct pagetable {
     pte_t entries[ENTRIES_PER_TABLE];
 };
@@ -70,7 +69,9 @@ struct pagetable {
 #define PD_BASE_INDEX 0
 #define PDP_BASE_INDEX 510
 #define PML4_BASE_INDEX 511
+#define P_PCD   (1ULL << 4)
 
+// Allocates a new page table and updates the next available address
 static inline struct pagetable* alloc_table(uintptr_t* next_addr, int* pt_count){
     struct pagetable *tbl = (struct pagetable*) *next_addr;
     *next_addr += 0x1000;
@@ -78,6 +79,7 @@ static inline struct pagetable* alloc_table(uintptr_t* next_addr, int* pt_count)
     return tbl;
 }
 
+// Initializes early identity mapping and maps the kernel to its canonical higher address space
 void load_paging(void) {
     int *pt_count = (int*)(uintptr_t)0x74FB;
     *pt_count = 0;
@@ -128,6 +130,7 @@ void load_paging(void) {
     /* done — assembly expects the PML4 at 0x100000 (cr3 will be loaded with that) */
 }
 
+// Long mode entry
 __attribute__((noreturn)) void enter_long_mode(void);
 
 void __attribute__((noreturn)) __attribute__((section(".text.stage3"))) stage3_main(void) {

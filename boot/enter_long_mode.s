@@ -6,7 +6,7 @@ section .text
     global enter_long_mode
     extern gdt64_ptr
 
-; -------- Switch to 64-bit long mode --------
+; Switch to 64-bit long mode
 enter_long_mode:
     ; Load gdt
     lgdt [gdt64_ptr]
@@ -20,6 +20,12 @@ enter_long_mode:
     mov ecx, 0xC0000080           ; IA32_EFER MS
     rdmsr
     or  eax, 1 << 8               ; set LME bit
+    wrmsr
+
+    ; Set IA32_EFER.NXE
+    mov ecx, 0xC0000080           ; IA32_EFER MS
+    rdmsr
+    or  eax, 1 << 11              ; set NXE bit
     wrmsr
 
     ; Load page table address into cr3
@@ -46,7 +52,7 @@ enter_long_mode:
 
 [bits 64]
 lm_entry:
-    mov rsp, 0x19000
+    mov rsp, 0x19000 ; Set up the kernel stack to 0x19000
     mov rbp, rsp
 
     mov rax, 0xFFFFFFFF80000000    ; jump to kernel_entry

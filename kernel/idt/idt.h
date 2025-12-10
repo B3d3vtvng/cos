@@ -5,7 +5,9 @@
 #include "../mem/kmalloc.h"
 #include "../util/conversion.h"
 #include "../util/string.h"
+#include "../mem/paging.h"
 
+// An entry in the Interrupt Descriptor Table (IDT)
 struct idt_entry {
     uint16_t offset_low;    // Bits 0-15 of handler function address
     uint16_t selector;      // Kernel segment selector
@@ -16,11 +18,13 @@ struct idt_entry {
     uint32_t zero;          // Reserved
 } __attribute__((packed));
 
+// Pointer to the IDT
 struct idt_ptr {
     uint16_t limit;
     uint64_t base;
 } __attribute__((packed));
 
+// An exception frame to be passed to exception handlers
 typedef struct excp_frame {
     uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
     uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;

@@ -6,6 +6,7 @@
 #include "mem/pmmalloc.h"
 #include "util/conversion.h"
 #include "sched/gdt.h"
+#include "mem/vmm.h"
 #include <stdint.h>
 
 #define PAGETABLE_ADDRESS (void*)0x90000

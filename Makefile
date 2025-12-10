@@ -37,7 +37,6 @@ C_IDT_SRC	  := $(wildcard kernel/idt/*.c)
 C_UTIL_SRC	  := $(wildcard kernel/util/*.c)
 C_SCHED_SRC := $(wildcard kernel/sched/*.c)
 C_SRC := kernel/kernel_main.c $(C_DRIVER_SRC) $(C_MEM_SRC) $(C_IDT_SRC) $(C_UTIL_SRC) $(C_SCHED_SRC)
-
 ASM_SRC := $(wildcard kernel/**/*.s)
 
 C_OBJ   := $(patsubst kernel/%.c, build/%.o, $(C_SRC))
@@ -88,8 +87,8 @@ build/kernel.bin: build/kernel.elf
 build/stage2.elf: boot/stage2.s | build
 	$(ASM) $(ASMFLAGS32) \
 		-DST2_SEC_CNT=1 \
-		-DSTAGE3_SEC_CNT=2 \
-		-DKERN_SEC_CNT=57 \
+		-DSTAGE3_SEC_CNT=3 \
+		-DKERN_SEC_CNT=81 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
 		-D__ELF__ \
@@ -98,10 +97,10 @@ build/stage2.elf: boot/stage2.s | build
 build/stage2.bin: build/stage2.elf
 	$(ASM) $(ASMFLAGS_BIN) \
 		-DST2_SEC_CNT=1 \
-		-DSTAGE3_SEC_CNT=2 \
+		-DSTAGE3_SEC_CNT=3 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
-		-DKERN_SEC_CNT=57 \
+		-DKERN_SEC_CNT=81 \
 		boot/stage2.s -o $@
 
 # =====================================
@@ -117,7 +116,7 @@ build/boot.bin: boot/boot_sec.s build/stage2.bin | build
 # Stage 3 loader
 # =====================================
 build/stage3.o : boot/stage3.c | build
-	$(CC) $(CFLAGS32) -DKERNEL_PG_CNT=10 -c $< -o $@
+	$(CC) $(CFLAGS32) -DKERNEL_PG_CNT=12 -c $< -o $@
 
 build/stage3.elf: build/enter_long_mode.o build/stage3.o | build
 	$(LD) $(LDFLAGS32) -T ld_scripts/stage3.ld -e stage3_main $^ -o $@ -g

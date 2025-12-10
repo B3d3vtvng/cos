@@ -10,6 +10,9 @@
 
 bits 16
 
+; Second stage bootloader main function
+; Loads the third stage and the kernel and loads the bios memory map
+; Also transitions to protected mode, setting up a minimal temporary gdt
 start:
     ; Make DS/ES match our code segment base (here CS expected to be 0x0000)
     push cs
@@ -64,6 +67,7 @@ disk_fail:
     hlt
     jmp .halt
 
+; Loads the kernel to 0x20000
 load_kernel:
     mov ax, 0x2000
     mov es, ax
@@ -84,6 +88,7 @@ load_bios_mmap:
     ; Get BIOS memory map via int 0x15, eax=0xE820
     ; Store entries starting at 0x7504, max 20 bytes each
     ; Store number of entries at 0x7500
+    ; We need the bios mmap for the physical memory manager later
     mov ax, 0
     mov es, ax
     mov di, 0x7504              ; buffer starts here
@@ -110,7 +115,7 @@ load_bios_mmap:
     jmp enter_prot_mode
 
 
-; -------- Switch to 32-bit protected mode --------
+; Switch to 32-bit protected mode
 enter_prot_mode:
     cli
     lgdt [gdt_descriptor]        ; load our flat GDT

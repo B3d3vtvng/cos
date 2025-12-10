@@ -23,6 +23,8 @@ SECTIONS
     .bss : {
         *(.bss);
     }
+
+    . = ALIGN(PAGE_SIZE);
     _kernel_end = .;
 
     _text_start = ADDR(.text);

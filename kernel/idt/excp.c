@@ -1,7 +1,11 @@
 #include "idt.h"
 
+// Round up to the nearest page boundary
 #define ROUND_PG(x) (((x) + 0xFFF) & ~0xFFF)
 
+static char* stack_guard_page = NULL;
+
+// A map of exception messages, indexed by exception number
 const char* excp_msg_map[] = {
     "Division By Zero",
     "Debug",
@@ -27,9 +31,13 @@ const char* excp_msg_map[] = {
     "Control Protection Exception"
 };
 
+// Declaration of ISR stub table, externally defined in isr.asm
 extern void* isr_stub_table[];
+
+// IDT pointer
 struct idt_ptr idt_pointer;
 
+// Set an entry in the IDT
 void idt_set_gate(struct idt_entry* idt_entries, int n, uint64_t handler, uint16_t selector, uint8_t flags){
     idt_entries[n].offset_low = handler & 0xFFFF;
     idt_entries[n].selector = selector;
@@ -40,6 +48,7 @@ void idt_set_gate(struct idt_entry* idt_entries, int n, uint64_t handler, uint16
     idt_entries[n].zero = 0;
 }
 
+// Initialize the IDT
 struct idt_ptr idt_init(void){
     void* idt_entries = kmalloc(sizeof(struct idt_entry) * 256);
     // Set up IDT entries for CPU exceptions (0-31)
@@ -54,12 +63,14 @@ struct idt_ptr idt_init(void){
     return idt_pointer;
 }
 
+// Common handler function for all hardware exceptions
 void isr_common_handler(struct excp_frame* excp_state){
     //TODO: Implement actual exception handlers
     kernel_panic(excp_state, excp_msg_map[excp_state->int_no]);
 }
 
 __attribute__((noreturn))
+// Unrecoverable kernel panic handler
 void kernel_panic(struct excp_frame* register_state, const char* message) {
     __asm__ volatile ("cli"); // disable interrupts
 
@@ -82,7 +93,7 @@ void kernel_panic(struct excp_frame* register_state, const char* message) {
     const int col_width = 38;
 
     #define REPORT_REG(reg) \
-        vga_print(#reg ": 0x"); \
+        vga_print(#reg ": "); \
         ltohex(register_state->reg, buffer); \
         vga_print(buffer);
 
@@ -105,6 +116,16 @@ void kernel_panic(struct excp_frame* register_state, const char* message) {
     PRINT2(rip, cs);
     PRINT2(rflags, ss);
     PRINT2(int_no, err_code);
+
+    if (register_state && register_state->int_no == 14){
+        kprintf("\nFaulting address: 0x%llx\n", get_cr2());
+
+        if (stack_guard_page != NULL && 
+            (get_cr2() >= (uint64_t)stack_guard_page && 
+             get_cr2() < (uint64_t)(stack_guard_page + 0x1000))) {
+            kprintf("Kernel Stack overflow detected (accessed guard page at 0x%llx)!\n", get_cr2());
+        }
+    }
 
     vga_print("\nSystem halted.\n");
 

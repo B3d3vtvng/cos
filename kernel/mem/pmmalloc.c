@@ -7,9 +7,15 @@ static size_t usable_entry_count;
 struct alloc_metadata alloc_meta;
 // Total number of pages used for the metadata structure itself
 static uint64_t metadata_page_count;
+static spinlock_t pmmalloc_lock = SPINLOCK_INIT;
+
+//Store the highest physical address for the vmm ram map
+static uint64_t mem_max;
+
+uint64_t get_mem_max(void){ return mem_max; }
 
 // Helper function definitions
-static inline uint64_t round_page_down(uint64_t addr);
+uint64_t round_page_down(uint64_t addr);
 static uint64_t get_page_index(uint64_t addr);
 uint64_t get_page_addr(uint64_t index);
 
@@ -65,6 +71,8 @@ void* pmmalloc(unsigned long count){
 
     uint64_t contiguous = 0;
     uint64_t start_index = 0;
+
+    flags_t flags = spinlock_aquire(&pmmalloc_lock);
     
     // Loop over the total number of allocatable pages
     for (uint64_t i = 0; i < alloc_meta.alloc_entry_count; i++) {
@@ -86,9 +94,11 @@ void* pmmalloc(unsigned long count){
                 
                 if (addr == 0) {
                     // This should not happen if indexing is correct
+                    spinlock_release(&pmmalloc_lock, flags);
                     kernel_panic(NULL, "PMMALLOC: Internal index-to-address conversion error");
                 }
                 
+                spinlock_release(&pmmalloc_lock, flags);
                 return (void*)(addr);
             }
         } 
@@ -97,6 +107,7 @@ void* pmmalloc(unsigned long count){
         }
     }
 
+    spinlock_release(&pmmalloc_lock, flags);
     return (void*)0; // No sufficient memory
 }
 
@@ -125,30 +136,49 @@ void pmmfree(void* ptr) {
         return; // Invalid free: pointer not to the start of a block
     }
     
+    flags_t flags = spinlock_aquire(&pmmalloc_lock);
+
     // Mark the block as free
     for (uint64_t i = 0; i < count; i++) {
         alloc_meta.alloc_entries[index + i].used = 0;
         alloc_meta.alloc_entries[index + i].contiguous_count = 0;
     }
+
+    spinlock_release(&pmmalloc_lock, flags);
 }
 
 // Round down to nearest page boundary
-static inline uint64_t round_page_down(uint64_t addr) {
+uint64_t round_page_down(uint64_t addr) {
     return addr & ~(PAGE_SZ - 1);
 }
 
 // Round up to nearest page boundary
-static inline uint64_t round_page_up(uint64_t addr) {
+uint64_t round_page_up(uint64_t addr) {
     return (addr + PAGE_SZ - 1) & ~(PAGE_SZ - 1);
 }
 
-void mark_pgtable_mem(void){
+size_t get_kernel_pg_count(void);
+
+void mark_used(void){
     int pgtable_cnt = *PGTABLE_CNT;
 
     int pml4_index = get_page_index(0x100000);
-    for (int i = 0; i < pgtable_cnt; i++){
+    for (int i = pml4_index; i < pml4_index + pgtable_cnt; i++){
         alloc_meta.alloc_entries[i].used = 1;
         alloc_meta.alloc_entries[i].contiguous_count = 1;
+    }
+
+    int kstack_index = get_page_index(0x10000);
+    alloc_meta.alloc_entries[kstack_index].contiguous_count = 9;
+    for (int i = kstack_index; i < kstack_index + 9; i++){
+        alloc_meta.alloc_entries[i].used = 1;
+    }
+
+    int k_index = get_page_index(0x20000);
+    int k_pg_cnt = get_kernel_pg_count();
+    alloc_meta.alloc_entries[k_index].contiguous_count = k_pg_cnt;
+    for (int i = k_index; i < k_index + k_pg_cnt; i++){
+        alloc_meta.alloc_entries[i].used = 1;
     }
 
     return;
@@ -168,7 +198,7 @@ void init_pmm(void) {
              if (bios_mmap[i].base_addr + bios_mmap[i].length > 0x10000) {
                 uint64_t new_base = 0x10000;
                 uint64_t new_length = (bios_mmap[i].base_addr + bios_mmap[i].length) - new_base;
-                bios_mmap[i].length = 0; // Zero out the original entry (optional, depends on BIOS_MMAP usage)
+                bios_mmap[i].length = 0; // Zero out the original entry
 
                 // Add the split entry starting from 0x10000
                 usable_entries[usable_entry_count].base_addr = new_base;
@@ -189,13 +219,13 @@ void init_pmm(void) {
             total_pages += pages_in_entry;
         }
     }
+
+    mem_max = usable_entries[usable_entry_count-1].base_addr + usable_entries[usable_entry_count-1].length;
     
-    // The total number of allocatable pages (our index size)
+    // The total number of allocatable pages
     alloc_meta.alloc_entry_count = total_pages;
 
     // 2. Calculate metadata size and initialize the entries
-    // Each entry is 2 bytes (1 for used/count, 1 for padding in the original). 
-    // If the struct is truly packed to 1 byte, sizeof(struct pg_entry) is 1. We assume 1 byte/entry.
     // Size needed = total_pages * sizeof(struct pg_entry)
     uint64_t metadata_size = total_pages * sizeof(struct pg_entry);
     metadata_page_count = round_page_up(metadata_size) / PAGE_SZ;
@@ -229,7 +259,7 @@ void init_pmm(void) {
         if (!alloc_meta.alloc_entries[i].used) pg_count++;
     }
 
-    mark_pgtable_mem();
+    mark_used();
 
     vga_print("Initialized physical memory allocator\n");
     kprintf("Found %d usable pages (%d KB)\n\n", pg_count, (pg_count * 4096) / 1000);

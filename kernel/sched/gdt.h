@@ -77,6 +77,6 @@ struct tss_desc{
 #define GDT_GRANULARITY_DATA (GDT_GRANULARITY_G | GDT_GRANULARITY_DB | GDT_GRANULARITY_NOL | GDT_GRANULARITY_AVL)
 
 
-void init_gdt_and_tss(void);
+struct gdt_ptr init_gdt_and_tss(void);
 
 #endif

@@ -3,6 +3,9 @@
     org 0x7C00                ; BIOS loads us here
 %endif
 
+; Entry point of the bootloader, called by the BIOS
+; Loads the second stage bootloader and prints a message
+
 start:
     xor ax, ax
     mov ds, ax

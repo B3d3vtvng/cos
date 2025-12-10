@@ -20,7 +20,7 @@ void init_tss(struct tss_desc* tss_descriptor, void* kern_stack, void* excp_df_s
     tss_descriptor->rsp1 = (uint64_t)kern_stack;
 }
 
-void init_gdt_and_tss(void){
+struct gdt_ptr init_gdt_and_tss(void){
     struct gdt_ptr gdtp;
     struct gdt_entry* entries = kmalloc(sizeof(struct gdt_entry) * 7);
 
@@ -41,7 +41,7 @@ void init_gdt_and_tss(void){
 
     // TSS
     void* kern_stack = (void*)0x19000; // Kernel stack base set in enter_long_mode
-    void* excp_df_stack = kmalloc(0x1000); // Allocate one page for double faults (might change later)
+    void* excp_df_stack = pmmalloc(1); // Allocate one page for double faults (might change later)
 
     init_tss((struct tss_desc*) &entries[5], kern_stack, excp_df_stack);
 
@@ -49,5 +49,5 @@ void init_gdt_and_tss(void){
     gdtp.limit = sizeof(struct gdt_entry) * 7;
 
     __asm__ __volatile__ ("lgdt %0" : : "m" (gdtp));
-    return;
+    return gdtp;
 }
