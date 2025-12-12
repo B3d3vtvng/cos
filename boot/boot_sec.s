@@ -35,7 +35,7 @@ start:
     mov ch, 0           ; cylinder 0
     mov cl, 2           ; sector 2 (sector 1 = boot sector)
     mov dh, 0           ; head 0
-    mov dl, 0           ; drive (set by BIOS in DL)
+    mov dl, 0x80  ; drive number from boot
 
     int 0x13
     jc .disk_fail       ; jump if error

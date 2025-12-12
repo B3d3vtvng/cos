@@ -3,9 +3,9 @@
 struct kernel_metadata kernel_meta;
 
 void init_devices(void){
-    init_fs();
-    init_timer();
-    init_keyboard();
+    //init_fs();
+    //init_timer();
+    //init_keyboard();
 }
 
 __attribute__((noreturn)) __attribute__((section(".text.kern_entry"))) void kernel_main(void) {

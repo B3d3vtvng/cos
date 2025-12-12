@@ -43,8 +43,8 @@ load_stage3:
     mov al, STAGE3_SEC_CNT         ; number of sectors to read
     mov ch, 0x00                 ; cylinder 0
     mov dh, 0x00                 ; head 0
+    mov dl, 0x80            ; drive number from boot
     mov cl, (2 + ST2_SEC_CNT)    ; starting sector (1-based)
-    ; DL (drive number) is preserved from Stage 1
 
     int 0x13
     jc  disk_fail                ; if CF set -> error
@@ -78,7 +78,7 @@ load_kernel:
     mov ch, 0           ; cylinder 0
     mov dh, 0           ; head 0
     mov cl, (2 + ST2_SEC_CNT + STAGE3_SEC_CNT) ; sector
-    mov dl, 0         ; drive (set by BIOS in DL)
+    mov dl, 0x80
     int 0x13
 
     jc disk_fail       ; jump if error
