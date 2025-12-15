@@ -36,7 +36,7 @@ BOOT32_C   := $(BOOT_C)
 BOOT_ASM_OBJ := $(patsubst boot/boot32/%.s, build/%.o, $(BOOT32_ASM))
 BOOT_C_OBJ   := $(patsubst boot/boot32/%.c, build/%.o, $(BOOT32_C))
 
-C_DRIVER_SRC   := $(wildcard kernel/drivers/*.c)
+C_DRIVER_SRC   := $(wildcard kernel/drivers/**/*.c)
 C_MEM_SRC     := $(wildcard kernel/mem/*.c)
 C_IDT_SRC     := $(wildcard kernel/idt/*.c)
 C_UTIL_SRC    := $(wildcard kernel/util/*.c)
@@ -65,7 +65,9 @@ all: clean build/os.img
 
 build:
 	mkdir -p build
-	mkdir -p build/drivers
+	mkdir -p build/drivers/vga
+	mkdir -p build/drivers/fs 
+	mkdir -p build/drivers/timer
 	mkdir -p build/mem
 	mkdir -p build/idt
 	mkdir -p build/util

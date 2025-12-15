@@ -1,7 +1,8 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include "drivers/vga.h"
+#include "drivers/vga/vga.h"
+#include "drivers/timer/timer.h"
 #include "idt/idt.h"
 #include "mem/pmmalloc.h"
 #include "util/conversion.h"

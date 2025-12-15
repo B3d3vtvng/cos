@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "../drivers/vga.h"
+#include "../drivers/vga/vga.h"
 #include "../util/printf.h"
 #include "../util/conversion.h"
 #include "../idt/idt.h"

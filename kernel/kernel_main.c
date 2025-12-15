@@ -4,7 +4,7 @@ struct kernel_metadata kernel_meta;
 
 void init_devices(void){
     //init_fs();
-    //init_timer();
+    init_timer_driver();
     //init_keyboard();
 }
 
