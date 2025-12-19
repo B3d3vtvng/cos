@@ -34,6 +34,7 @@ struct alloc_metadata {
 };
 
 void init_pmm(void);
+void pmm_switch_virt(void);
 void* pmmalloc(unsigned long count);
 void pmmfree(void* ptr);
 uint64_t round_page_down(uint64_t);

@@ -12,6 +12,10 @@ static spinlock_t pmmalloc_lock = SPINLOCK_INIT;
 //Store the highest physical address for the vmm ram map
 static uint64_t mem_max;
 
+void pmm_switch_virt(void){
+    alloc_meta.alloc_entries = (struct pg_entry*)((uintptr_t) alloc_meta.alloc_entries | (uintptr_t) 0xFFFF800000000000ULL);
+}
+
 uint64_t get_mem_max(void){ return mem_max; }
 
 // Helper function definitions

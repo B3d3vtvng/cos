@@ -1,16 +1,9 @@
 #include "paging.h"
 
-static void* (*pg_alloc_table)(size_t) = pmmalloc;
-static void (*pg_free_table)(void*) = pmmfree;
+static bool _paging_access_direct = true;
 
-// Set the paging table allocator function
-void set_paging_allocator(void* (*alloc_func)(size_t)){
-    pg_alloc_table = alloc_func;
-}
-
-// Set the paging table free function
-void set_paging_free(void (*free_func)(void*)){
-    pg_free_table = free_func;
+void set_paging_access(bool direct){
+    _paging_access_direct = direct;
 }
 
 // Checks whether a page table entry is present
@@ -50,24 +43,36 @@ void invlpg(uint64_t addr) {
 */
 uint64_t* get_pg_entry(struct pagetable* pml4, uint64_t addr){
     struct pagetable* cur_pgtable = pml4;
+    if (!_paging_access_direct){
+        pml4 += RAM_MAP_OFF;
+    }
     uint64_t entry_value;
 
     entry_value = cur_pgtable->entries[(addr >> 39) & 0x1FF];
     if (!is_present(entry_value)) return NULL;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     entry_value = cur_pgtable->entries[(addr >> 30) & 0x1FF];
     if (!is_present(entry_value)) return NULL;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     entry_value = cur_pgtable->entries[(addr >> 21) & 0x1FF];
     if (!is_present(entry_value)) return NULL;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     entry_value = cur_pgtable->entries[(addr >> 12) & 0x1FF];
     if (!is_present(entry_value)) return NULL;
 
-    return (uint64_t*) &cur_pgtable->entries[(addr >> 12) & 0x1FF];
+   return (uint64_t*)&cur_pgtable->entries[(addr >> 12) & 0x1FF];
 }
 
 // Returns the currently active PML4
@@ -133,24 +138,38 @@ int map_virtual_pg_huge(struct pagetable* pml4, uint64_t virt, uint64_t phys, ui
 // Unmaps a virtual address from the page tables
 void unmap_virtual(struct pagetable* pml4, uint64_t virt, enum pg_size pg_size){
     struct pagetable* cur_pgtable = pml4;
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+        pml4 = (struct pagetable*)((uintptr_t)pml4 | (uintptr_t)RAM_MAP_OFF);
+    }
+
     struct pagetable* pdpt, *pd, *pt;
     uint64_t entry_value;
 
     entry_value = cur_pgtable->entries[(virt >> 39) & 0x1FF];
     if (!is_present(entry_value)) return;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
     pdpt = cur_pgtable;
 
     entry_value = cur_pgtable->entries[(virt >> 30) & 0x1FF];
     if (!is_present(entry_value)) return;
     if (pg_size == PG_SIZE_HUGE) goto pdpt_clear;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
     pd = cur_pgtable;
 
     entry_value = cur_pgtable->entries[(virt >> 21) & 0x1FF];
     if (!is_present(entry_value)) return;
     if (pg_size == PG_SIZE_LARGE) goto pd_clear;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
     pt = cur_pgtable;
 
     entry_value = cur_pgtable->entries[(virt >> 12) & 0x1FF];
@@ -164,7 +183,7 @@ void unmap_virtual(struct pagetable* pml4, uint64_t virt, enum pg_size pg_size){
     }
 
     pd_clear:
-        pg_free_table(pt);
+        pmmfree((void*)((uintptr_t)pt - RAM_MAP_OFF));
         
         pd->entries[(virt >> 21) & 0x1FF] = 0;
         for (int i = 0; i < ENTRIES_PER_TABLE; i++){
@@ -172,14 +191,14 @@ void unmap_virtual(struct pagetable* pml4, uint64_t virt, enum pg_size pg_size){
         }
 
     pdpt_clear:
-        pg_free_table(pd);
+        pmmfree((void*)((uintptr_t)pd - RAM_MAP_OFF));
 
         pdpt->entries[(virt >> 30) & 0x1FF] = 0;
         for (int i = 0; i < ENTRIES_PER_TABLE; i++){
             if (pdpt->entries[i] != 0) return;
         }
 
-    pg_free_table(pdpt);
+    pmmfree((void*)((uintptr_t)pdpt - RAM_MAP_OFF));
     pml4->entries[(virt >> 39) & 0x1FF] = 0;
 }
 
@@ -202,36 +221,57 @@ int map_virtual_pg_reg(struct pagetable* pml4, uint64_t virt, uint64_t phys, uin
     }
 
     struct pagetable* cur_pgtable = pml4;
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
     uint64_t entry_value;
 
     entry_value = cur_pgtable->entries[(virt >> 39) & 0x1FF];
     if (!is_present(entry_value)) goto pdpt_new;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     entry_value = cur_pgtable->entries[(virt >> 30) & 0x1FF];
     if (!is_present(entry_value)) goto pd_new;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     entry_value = cur_pgtable->entries[(virt >> 21) & 0x1FF];
     if (!is_present(entry_value)) goto pt_new;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     goto set_entry;
 
     pdpt_new:
-        struct pagetable* new_pdpt = pg_alloc_table(1);
+        struct pagetable* new_pdpt = pmmalloc(1);
         pml4->entries[(virt >> 39) & 0x1FF] = (uint64_t)new_pdpt | P_PRESENT | P_WRITABLE;
         cur_pgtable = new_pdpt;
+        if (!_paging_access_direct){
+            cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+        }
 
     pd_new:
-        struct pagetable* new_pd = pg_alloc_table(1);
+        struct pagetable* new_pd = pmmalloc(1);
         cur_pgtable->entries[(virt >> 30) & 0x1FF] = (uint64_t)new_pd | P_PRESENT | P_WRITABLE;
         cur_pgtable = new_pd;
+        if (!_paging_access_direct){
+            cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+        }
 
     pt_new:
-        struct pagetable* new_pt = pg_alloc_table(1);
+        struct pagetable* new_pt = pmmalloc(1);
         cur_pgtable->entries[(virt >> 21) & 0x1FF] = (uint64_t)new_pt | P_PRESENT | P_WRITABLE;
         cur_pgtable = new_pt;
+        if (!_paging_access_direct){
+            cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+        }
     
     set_entry:
         cur_pgtable->entries[(virt >> 12) & 0x1FF] = phys | flags | P_PRESENT;
@@ -245,27 +285,42 @@ int map_virtual_pg_large(struct pagetable* pml4, uint64_t virt, uint64_t phys, u
     }
 
     struct pagetable* cur_pgtable = pml4;
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
     uint64_t entry_value;
 
     entry_value = cur_pgtable->entries[(virt >> 39) & 0x1FF];
     if (!is_present(entry_value)) goto pdpt_new;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+            cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     entry_value = cur_pgtable->entries[(virt >> 30) & 0x1FF];
     if (!is_present(entry_value)) goto pd_new;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+            cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     goto set_entry;
 
     pdpt_new:
-        struct pagetable* new_pdpt = pg_alloc_table(1);
+        struct pagetable* new_pdpt = pmmalloc(1);
         pml4->entries[(virt >> 39) & 0x1FF] = (uint64_t)new_pdpt | P_PRESENT | P_WRITABLE;
         cur_pgtable = new_pdpt;
+        if (!_paging_access_direct){
+            cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+        }
 
     pd_new:
-        struct pagetable* new_pd = pg_alloc_table(1);
+        struct pagetable* new_pd = pmmalloc(1);
         cur_pgtable->entries[(virt >> 30) & 0x1FF] = (uint64_t)new_pd | P_PRESENT | P_WRITABLE;
         cur_pgtable = new_pd;
+        if (!_paging_access_direct){
+            cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+        }
     
     set_entry:
         cur_pgtable->entries[(virt >> 21) & 0x1FF] = phys | flags | P_PS | P_PRESENT;
@@ -279,18 +334,27 @@ int map_virtual_pg_huge(struct pagetable* pml4, uint64_t virt, uint64_t phys, ui
     }
 
     struct pagetable* cur_pgtable = pml4;
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
     uint64_t entry_value;
 
     entry_value = cur_pgtable->entries[(virt >> 39) & 0x1FF];
     if (!is_present(entry_value)) goto pdpt_new;
     cur_pgtable = (struct pagetable*)get_next_table_addr(entry_value);
+    if (!_paging_access_direct){
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+    }
 
     goto set_entry;
 
     pdpt_new:
-        struct pagetable* new_pdpt = pg_alloc_table(1);
+        struct pagetable* new_pdpt = pmmalloc(1);
         pml4->entries[(virt >> 39) & 0x1FF] = (uint64_t)new_pdpt | P_PRESENT | P_WRITABLE;
         cur_pgtable = new_pdpt;
+        if (!_paging_access_direct){
+            cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+        }
     
     set_entry:
         cur_pgtable->entries[(virt >> 30) & 0x1FF] = phys | flags | P_PS | P_PRESENT;
