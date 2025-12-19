@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "pmmalloc.h"
 #include "vpgalloc.h"
@@ -20,6 +21,8 @@
 #define P_PCD   (1ULL << 4)
 #define P_PAT   (1ULL << 7)
 
+#define RAM_MAP_OFF 0xFFFF800000000000ULL
+
 #define P_WC    (P_PAT | P_PWT)
 
 enum pg_size {
@@ -34,8 +37,7 @@ struct pagetable {
     pte_t entries[ENTRIES_PER_TABLE];
 };
 
-void set_paging_allocator(void* (*alloc_func)(size_t));
-void set_paging_free(void (*free_func)(void*));
+void set_paging_access(bool direct);
 uint64_t get_cr2(void);
 void invtlb(void);
 void invlpg(uint64_t addr);
