@@ -17,4 +17,4 @@ void* alloc_virt(size_t);
 void free_virt(void*);
 void vmalloc_init(void);
 
-#endif;
+#endif

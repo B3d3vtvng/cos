@@ -104,37 +104,6 @@ uint64_t update_stack_mappings(void){
     return stack_virt_base + (stack_phys_top - stack_phys_base);
 }
 
-void _update_pagetable_mappings(struct pagetable* pgtable, int depth){
-    if (depth == 0) return;
-
-    for (int i = 0; i < ENTRIES_PER_TABLE; i++){
-        pte_t entry = pgtable->entries[i];
-        if (entry & P_PRESENT && entry < 0xffff800000000000ULL){
-            uint64_t phys_addr = entry & ~0xFFFULL;
-            uint64_t virt_addr = phys_addr + 0xFFFF800000000000ULL;
-
-            map_virtual(get_pgtable(), virt_addr, phys_addr, entry & 0xFFFULL, (entry & P_PS) ? PG_SIZE_LARGE : PG_SIZE_REG);
-
-            if (!(entry & P_PS)){
-                struct pagetable* next_level = (struct pagetable*)(uintptr_t)(phys_addr);
-                _update_pagetable_mappings(next_level, depth - 1);
-            }
-        }
-    }
-}
-
-void update_pagetable_mappings(void){
-    struct pagetable* pml4 = get_pgtable();
-    _update_pagetable_mappings(pml4, 3);
-
-    map_virtual(pml4, (uint64_t)pml4 + 0xFFFF800000000000ULL, (uint64_t)pml4, P_PRESENT | P_WRITABLE | P_KERNEL, PG_SIZE_REG);
-    invtlb();
-
-    set_pgtable(pml4 + 0xFFFF800000000000ULL);
-
-    vga_print("Updated pagetable mappings!\n");
-}
-
 void unmap_idmap(void){
     struct pagetable* pml4 = get_pgtable();
     for (uint64_t addr = 0x0; addr < 0x200000; addr += 0x1000){
