@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "../mem/kmalloc.h"
+#include "../util/asm.h"
 
 struct gdt_entry {
     uint16_t limit_low;     // Bits 0-15 of limit
@@ -19,7 +20,18 @@ struct gdt_ptr {
     uint64_t base;          // 64-bit base for lgdt
 } __attribute__((packed));
 
-struct tss_desc{
+struct tss_desc {
+    uint16_t limit0;
+    uint16_t base0;  // Base bits 0-15
+    uint8_t base1;   // Base bits 16-23
+    uint8_t access;
+    uint8_t limit1_flags;
+    uint8_t base2;   // Base bits 24-31
+    uint32_t base3;  // Base bits 32-63
+    uint32_t reserved;
+} __attribute__((packed));
+
+struct tss{
     uint32_t reserved1;
     uint64_t rsp1; // Kernel stack address
     uint64_t rsp2; // Unused -> NULL
@@ -78,5 +90,7 @@ struct tss_desc{
 
 
 struct gdt_ptr init_gdt_and_tss(void);
+uint64_t get_tss_base(struct tss_desc* desc);
+void set_tss_base(struct tss_desc* tss_descriptor, uint64_t base);
 
 #endif

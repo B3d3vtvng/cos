@@ -2,8 +2,6 @@
 
 section .text
     global update_stack_ptr
-    extern _text_start
-    extern _rodata_start
 
 ; Updates the stack pointer to the new virtual stack location
 ; Expects rdi to hold the new stack pointer address

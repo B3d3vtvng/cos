@@ -11,7 +11,7 @@
 
 #define BIOS_MMAP_ADDR      ((struct bios_mmap_entry*)0x7504)
 #define BIOS_MMAP_COUNT    (*(int*)0x7500)
-#define ALLOC_ENTRY_BASE ((void*)0x10000)
+#define ALLOC_ENTRY_BASE ((void*)0x50000)
 #define PAGE_SZ 0x1000ULL
 #define KPG_MALLOC_MAX 128 // Max allocation size is 127 pages
 #define PGTABLE_CNT ((int*)0x74FB)

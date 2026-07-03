@@ -44,7 +44,8 @@ void invlpg(uint64_t addr) {
 uint64_t* get_pg_entry(struct pagetable* pml4, uint64_t addr){
     struct pagetable* cur_pgtable = pml4;
     if (!_paging_access_direct){
-        pml4 += RAM_MAP_OFF;
+        cur_pgtable = (struct pagetable*)((uintptr_t)cur_pgtable | (uintptr_t)RAM_MAP_OFF);
+        pml4 = (struct pagetable*)((uintptr_t)pml4 | (uintptr_t)RAM_MAP_OFF);
     }
     uint64_t entry_value;
 

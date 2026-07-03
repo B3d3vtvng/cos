@@ -35,6 +35,7 @@ typedef struct excp_frame {
 } excp_frame_t;
 
 struct idt_ptr idt_init(void);
+void idt_set_gate(struct idt_entry* idt_entries, int n, uint64_t handler, uint16_t selector, uint8_t flags);
 void __attribute__((noreturn)) kernel_panic(struct excp_frame* register_state, const char* message);
 
 #endif

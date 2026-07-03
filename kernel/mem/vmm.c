@@ -115,14 +115,22 @@ void unmap_idmap(void){
 
 void update_gdt_and_tss(struct gdt_ptr* gdt_ptr, uint64_t stack_virt_top){
     struct tss_desc* tss_descriptor = (struct tss_desc*)((uint64_t)gdt_ptr->base + 5 * sizeof(struct gdt_entry));
-    tss_descriptor->rsp1 = stack_virt_top;
-    tss_descriptor->ist1 += 0xFFFF800000000000ULL;
+    uint64_t tss_phys = get_tss_base(tss_descriptor);
+    tss_phys = tss_phys | 0xFFFF800000000000ULL;
+    set_tss_base(tss_descriptor, tss_phys);
+    struct tss* tss = (struct tss*) tss_phys;
+    tss->rsp1 = stack_virt_top;
 
-    __asm__ __volatile__ ("lgdt %0" : : "m" (*gdt_ptr));
+    uint64_t tss_ist1_virt = (uint64_t)alloc_virt(1);
+    map_virtual(get_pgtable(), tss_ist1_virt, tss->ist1, P_KERNEL | P_PRESENT | P_WRITABLE | P_NX_ENABLE, PG_SIZE_REG);
+    tss->ist1 = tss_ist1_virt + 0xFF0; // Stack grows downward, so provide highest 16-bit aligned address
+
+    gdt_ptr->base = gdt_ptr->base | 0xFFFF800000000000ULL;
+
     return;
 }
 
-void switch_virt(struct gdt_ptr* gdt_ptr){
+void switch_virt(struct gdt_ptr* gdt_ptr, struct idt_ptr* idtp){
     char* vga_text_buf_virt_ = alloc_virt(1); // Allocate a virtual page and then map them ourselves
     map_virtual(get_pgtable(), (uint64_t)vga_text_buf_virt_, (uint64_t)VGA_START, P_PRESENT | P_WRITABLE | P_KERNEL | P_PCD | P_PWT, PG_SIZE_REG);
     vga_remap_buffer(vga_text_buf_virt_);
@@ -133,16 +141,20 @@ void switch_virt(struct gdt_ptr* gdt_ptr){
     vga_print("Remapped vga text buffer!\n");
 
     uint64_t kern_stack_addr = update_stack_mappings();
+
     update_gdt_and_tss(gdt_ptr, kern_stack_addr);
+
+    idtp->base = idtp->base | 0xFFFF800000000000ULL;
     set_paging_access(false);
     pmm_switch_virt();
+    liballoc_switch_virt();
 
     unmap_idmap();
     return;
 }
 
 
-void vmm_init(struct gdt_ptr* gdt_ptr){
+void vmm_init(struct gdt_ptr* gdt_ptr, struct idt_ptr* idtp){
     struct pagetable* pml4 = get_pgtable();
 
     set_section_prot(pml4, (uintptr_t)&_text_start, (uintptr_t)&_rodata_start, P_PRESENT | P_READONLY | P_KERNEL);
@@ -158,6 +170,6 @@ void vmm_init(struct gdt_ptr* gdt_ptr){
 
     vmalloc_init();
 
-    switch_virt(gdt_ptr);
+    switch_virt(gdt_ptr, idtp);
 }
 

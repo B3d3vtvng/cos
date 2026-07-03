@@ -23,8 +23,10 @@
 #include "kmalloc.h"
 #include "../util/string.h"
 #include "../sched/gdt.h"
+#include "../util/asm.h"
+#include "../idt/idt.h"
 
-void vmm_init(struct gdt_ptr* gdt_ptr);
+void vmm_init(struct gdt_ptr* gdt_ptr, struct idt_ptr* idtp);
 void* vpgalloc(size_t);
 void vpgfree(void*);
 

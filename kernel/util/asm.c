@@ -33,3 +33,31 @@ void wrmsr(uint32_t msr, uint64_t value) {
         : "memory"
     );
 }
+
+void lgdt(uint64_t gdt_ptr){
+    __asm__ __volatile__ ("lgdt %0" : : "m" (gdt_ptr) : "memory");
+}
+
+void ltr(uint16_t tss_selector){
+    __asm__ __volatile__("ltr %0" : : "r" (tss_selector) : "memory");
+}
+
+// Send 8 bits to a port
+void io_outb(uint16_t port, uint8_t val) {
+    __asm__ __volatile__ (
+        "outb %0, %1" 
+        : 
+        : "a"(val), "Nd"(port) 
+    );
+}
+
+// Receive 8 bits from a port
+uint8_t io_inb(uint16_t port) {
+    uint8_t ret;
+    __asm__ __volatile__ (
+        "inb %1, %0"
+        : "=a"(ret)
+        : "Nd"(port)
+    );
+    return ret;
+}

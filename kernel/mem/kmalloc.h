@@ -46,6 +46,7 @@ void      kfree(void *);					//< The standard function.
 
 void      liballoc_set_pgalloc(void*(size_t)); // Change the pgalloc function (useful when switching from identity mapping to cannonical mapping)
 void	  liballoc_set_pgfree(void(void*)); // Change the pgfree function (same as above)
+void	  liballoc_switch_virt(void); // Switch to virtual memory
 
 #ifdef __cplusplus
 }

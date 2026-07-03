@@ -102,6 +102,10 @@ void *alloc_virt(size_t pages) {
             while (i > order) {
                 i--;
                 uintptr_t buddy_addr = (uintptr_t)block + (1UL << (i + PAGE_SHIFT));
+                if (virt_to_phys(buddy_addr) == 0){
+                    uint64_t buddy_phys = (uint64_t)pmmalloc(1);
+                    map_virtual(get_pgtable(), buddy_addr, buddy_phys, P_PRESENT | P_KERNEL | P_NX_ENABLE | P_WRITABLE, PG_SIZE_REG);
+                }
                 struct free_list *buddy = (struct free_list *)buddy_addr;
                 buddy->next = free_lists[i];
                 free_lists[i] = buddy;

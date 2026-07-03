@@ -174,7 +174,7 @@ void mark_used(void){
 
     int kstack_index = get_page_index(0x10000);
     alloc_meta.alloc_entries[kstack_index].contiguous_count = 9;
-    for (int i = kstack_index; i < kstack_index + 9; i++){
+    for (int i = kstack_index; i <= kstack_index + 9; i++){
         alloc_meta.alloc_entries[i].used = 1;
     }
 
@@ -242,15 +242,7 @@ void init_pmm(void) {
         ((uint8_t*)alloc_meta.alloc_entries)[i] = 0;
     }
 
-    // 3. Mark the pages used by the metadata itself as used (from index 0)
-    // The metadata starts at 0x10000, which corresponds to the first page index (0) 
-    // *if* 0x10000 is the start of the first usable entry.
     uint64_t metadata_start_index = get_page_index((uint64_t)ALLOC_ENTRY_BASE);
-    
-    if (metadata_start_index == (uint64_t)-1 || metadata_start_index != 0) {
-        // This is a critical error: metadata is not at the start of the index space
-        kernel_panic(NULL, "PMMALLOC: Metadata must start at global page index 0");
-    }
 
     for (uint64_t i = metadata_start_index; i < metadata_start_index + metadata_page_count; i++){
         alloc_meta.alloc_entries[i].used = 1;

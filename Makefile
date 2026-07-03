@@ -42,7 +42,10 @@ C_IDT_SRC     := $(wildcard kernel/idt/*.c)
 C_UTIL_SRC    := $(wildcard kernel/util/*.c)
 C_SCHED_SRC := $(wildcard kernel/sched/*.c)
 C_SRC := kernel/kernel_main.c $(C_DRIVER_SRC) $(C_MEM_SRC) $(C_IDT_SRC) $(C_UTIL_SRC) $(C_SCHED_SRC)
-ASM_SRC := $(wildcard kernel/**/*.s)
+ASM_SRC_KERNEL := $(wildcard kernel/**/*.s)
+ASM_SRC_DRIVER := $(wildcard kernel/drivers/**/*.s)
+
+ASM_SRC := $(ASM_SRC_KERNEL) $(ASM_SRC_DRIVER)
 
 C_OBJ   := $(patsubst kernel/%.c, build/%.o, $(C_SRC))
 ASM_OBJ := $(patsubst kernel/%.s, build/%.o, $(ASM_SRC))
@@ -68,6 +71,7 @@ build:
 	mkdir -p build/drivers/vga
 	mkdir -p build/drivers/fs 
 	mkdir -p build/drivers/timer
+	mkdir -p build/drivers/apic
 	mkdir -p build/mem
 	mkdir -p build/idt
 	mkdir -p build/util
@@ -104,7 +108,7 @@ build/stage2.elf: boot/stage2.s | build
 	$(ASM) $(ASMFLAGS32) \
 		-DST2_SEC_CNT=1 \
 		-DSTAGE3_SEC_CNT=3 \
-		-DKERN_SEC_CNT=81 \
+		-DKERN_SEC_CNT=89 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
 		-D__ELF__ \
@@ -116,7 +120,7 @@ build/stage2.bin: build/stage2.elf
 		-DSTAGE3_SEC_CNT=3 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
-		-DKERN_SEC_CNT=81 \
+		-DKERN_SEC_CNT=89 \
 		boot/stage2.s -o $@
 
 # =====================================
@@ -132,7 +136,7 @@ build/boot.bin: boot/boot_sec.s build/stage2.bin | build
 # Stage 3 loader
 # =====================================
 build/stage3.o : boot/stage3.c | build
-	$(CC) $(CFLAGS32) -DKERNEL_PG_CNT=12 -c $< -o $@
+	$(CC) $(CFLAGS32) -DKERNEL_PG_CNT=15 -c $< -o $@
 
 build/stage3.elf: build/enter_long_mode.o build/stage3.o | build
 	$(LD) $(LDFLAGS32) -T ld_scripts/stage3.ld -e stage3_main $^ -o $@ -g

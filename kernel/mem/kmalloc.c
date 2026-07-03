@@ -23,12 +23,12 @@ static void*(*liballoc_pgalloc)(size_t) = pmmalloc;
 static void(*liballoc_pgfree)(void*) = pmmfree;
 
 struct boundary_tag* l_freePages[MAXEXP];		//< Allowing for 2^MAXEXP blocks
-int 				 l_completePages[MAXEXP];	//< Allowing for 2^MAXEXP blocks
+long long 				 l_completePages[MAXEXP];	//< Allowing for 2^MAXEXP blocks
 
 
 #ifdef DEBUG
-unsigned int l_allocated = 0;		//< The real amount of memory allocated.
-unsigned int l_inuse = 0;			//< The amount of memory in use (malloc'ed). 
+unsigned long long l_allocated = 0;		//< The real amount of memory allocated.
+unsigned long long l_inuse = 0;			//< The amount of memory in use (malloc'ed). 
 #endif
 
 
@@ -43,7 +43,7 @@ static int l_pageCount = 16;			//< Minimum number of pages to allocate.
  *
  *  Returns n where  2^n <= size < 2^(n+1)
  */
-static inline int getexp( unsigned int size )
+static inline long long getexp( unsigned long long size )
 {
 	if ( size < (1<<MINEXP) ) 
 	{
@@ -209,7 +209,7 @@ static inline struct boundary_tag* split_tag( struct boundary_tag* tag )
 	unsigned int remainder = tag->real_size - sizeof(struct boundary_tag) - tag->size;
 		
 	struct boundary_tag *new_tag = 
-				   (struct boundary_tag*)((unsigned int)tag + sizeof(struct boundary_tag) + tag->size);	
+				   (struct boundary_tag*)((unsigned long long)tag + sizeof(struct boundary_tag) + tag->size);	
 	
 						new_tag->magic = LIBALLOC_MAGIC;
 						new_tag->real_size = remainder;	
@@ -376,7 +376,7 @@ void *kmalloc(size_t size)
 		
 		
 
-	ptr = (void*)((unsigned int)tag + sizeof( struct boundary_tag ) );
+	ptr = (void*)((unsigned long long)tag + sizeof( struct boundary_tag ) );
 
 
 	
@@ -525,6 +525,13 @@ void*   krealloc(void *p, size_t size)
 	kfree( p );
 
 	return ptr;
+}
+
+void liballoc_switch_virt(void){
+	for (size_t i = 0; i < MAXEXP; i++){
+		if (!l_freePages[i]) continue;
+		l_freePages[i] = (struct boundary_tag*) ((uint64_t)l_freePages[i] | 0xFFFF800000000000ULL);
+	}
 }
 
 void liballoc_set_pgalloc(void*(*pgalloc_func)(size_t)){
