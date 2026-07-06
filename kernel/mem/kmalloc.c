@@ -405,7 +405,7 @@ void kfree(void *ptr)
 	flags_t flags = spinlock_aquire(&lock);
 	
 
-		tag = (struct boundary_tag*)((unsigned int)ptr - sizeof( struct boundary_tag ));
+		tag = (struct boundary_tag*)((uintptr_t)ptr - sizeof(struct boundary_tag));
 	
 		if ( tag->magic != LIBALLOC_MAGIC ) 
 		{

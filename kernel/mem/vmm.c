@@ -86,10 +86,13 @@ uint64_t update_stack_mappings(void){
     uint64_t stack_phys_base = 0x10000ULL;
     uint64_t stack_phys_top = 0x19000ULL;
     uint64_t stack_virt_base = (uint64_t)alloc_virt((stack_phys_top - stack_phys_base) >> 12);
-    // Map a guard page below the stack
+    uint64_t stack_virt_off = 0x1000;
+    uint64_t stack_virt_start = stack_virt_base + stack_virt_off;
+
+    // Map a guard page below the stack, then mirror each physical stack page
     map_virtual(pml4, stack_virt_base, 0x0, P_NX_ENABLE | P_KERNEL, PG_SIZE_REG);
-    for (uint64_t addr = 0x1000; addr < (stack_phys_top - stack_phys_base); addr += 0x1000){
-        map_virtual(pml4, stack_virt_base + addr, stack_phys_base + addr, P_PRESENT | P_WRITABLE | P_KERNEL | P_NX_ENABLE, PG_SIZE_REG);
+    for (uint64_t phys = stack_phys_base; phys < stack_phys_top; phys += 0x1000){
+        map_virtual(pml4, stack_virt_start + (phys - stack_phys_base), phys, P_PRESENT | P_WRITABLE | P_KERNEL | P_NX_ENABLE, PG_SIZE_REG);
     }
 
     // Update the stack pointer
@@ -97,11 +100,11 @@ uint64_t update_stack_mappings(void){
     __asm__ __volatile__ ("mov %%rbp, %0" : "=r"(rbp));
     __asm__ __volatile__ ("mov %%rsp, %0" : "=r"(rsp));
 
-    update_stack_ptr(stack_virt_base + (rsp - stack_phys_base), stack_virt_base + (rbp - stack_phys_base));
-    update_frame_pointers(stack_phys_base, stack_phys_top, stack_virt_base);
+    update_stack_ptr(stack_virt_start + (rsp - stack_phys_base), stack_virt_start + (rbp - stack_phys_base));
+    update_frame_pointers(stack_phys_base, stack_phys_top, stack_virt_start);
 
     vga_print("Updated stack mappings!\n");
-    return stack_virt_base + (stack_phys_top - stack_phys_base);
+    return stack_virt_start + (stack_phys_top - stack_phys_base);
 }
 
 void unmap_idmap(void){
@@ -145,6 +148,11 @@ void switch_virt(struct gdt_ptr* gdt_ptr, struct idt_ptr* idtp){
     update_gdt_and_tss(gdt_ptr, kern_stack_addr);
 
     idtp->base = idtp->base | 0xFFFF800000000000ULL;
+
+    lgdt(gdt_ptr);
+    lidt(idtp);
+    ltr(0x28);
+
     set_paging_access(false);
     pmm_switch_virt();
     liballoc_switch_virt();

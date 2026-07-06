@@ -24,9 +24,11 @@ struct notify_queue{
     struct notify_queue* next;
 };
 
-void timer_init(struct idt_ptr idtp);
+void timer_init(struct idt_ptr* idtp);
+void timer_start(void);
 uint32_t notify_add(uint64_t ms, void (*notify_callback)(struct proc_state*));
 uint32_t notify_once(uint64_t ms, void (*notify_callback)(struct proc_state*));
 void notify_remove(uint32_t id);
+void timer_busy_wait(uint64_t ms);
 
 #endif

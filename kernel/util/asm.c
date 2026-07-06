@@ -1,4 +1,6 @@
 #include "asm.h"
+#include "../sched/gdt.h"
+#include "../idt/idt.h"
 
 // Execute CPUID
 void cpuid(uint32_t leaf, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx) {
@@ -34,8 +36,12 @@ void wrmsr(uint32_t msr, uint64_t value) {
     );
 }
 
-void lgdt(uint64_t gdt_ptr){
-    __asm__ __volatile__ ("lgdt %0" : : "m" (gdt_ptr) : "memory");
+void lgdt(struct gdt_ptr* gdt_ptr){
+    __asm__ __volatile__ ("lgdt %0" : : "m" (*gdt_ptr) : "memory");
+}
+
+void lidt(struct idt_ptr* idt_ptr){
+    __asm__ __volatile__ ("lidt %0" : : "m" (*idt_ptr) : "memory");
 }
 
 void ltr(uint16_t tss_selector){
@@ -52,6 +58,10 @@ void io_outb(uint16_t port, uint8_t val) {
 }
 
 // Receive 8 bits from a port
+void io_wait(void){
+    io_outb(0x80, 0);
+}
+
 uint8_t io_inb(uint16_t port) {
     uint8_t ret;
     __asm__ __volatile__ (

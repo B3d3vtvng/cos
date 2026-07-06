@@ -1,3 +1,5 @@
+[bits 64]
+
 section .text
 
 extern handle_timer
@@ -24,9 +26,11 @@ isr_timer:
     push r14
     push r15
 
-    ; Call the timer interrupt handler in c, passing the current stack frame as an argument
+    ; Align stack for the SysV AMD64 ABI (RSP % 16 == 8 before CALL)
     mov rdi, rsp
+    sub rsp, 8
     call handle_timer
+    add rsp, 8
 
      ; Restore general purpose registers
     pop r15

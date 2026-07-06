@@ -3,14 +3,16 @@
 struct kernel_metadata kernel_meta;
 
 void init_devices(void){
-    init_apic(kernel_meta.idt_ptr);
+    init_apic(&kernel_meta.idt_ptr);
+    timer_init(&kernel_meta.idt_ptr);
+    timer_start();
     //init_fs();
-    timer_init(kernel_meta.idt_ptr);
     //init_keyboard();
 }
 
 void print_msg(struct proc_state* pstate){
-    vga_print("Hello from timer");
+    (void)pstate;
+    vga_print("\nHello from timer\n");
 }
 
 __attribute__((noreturn)) __attribute__((section(".text.kern_entry"))) void kernel_main(void) {
@@ -43,9 +45,7 @@ __attribute__((noreturn)) __attribute__((section(".text.kern_entry"))) void kern
 
     //sched_start();
 
-    notify_once(1000, print_msg);
-
     while (1){
-        __asm__ __volatile__("hlt");
+        __asm__ __volatile__("sti; hlt" ::: "memory");
     }
 }

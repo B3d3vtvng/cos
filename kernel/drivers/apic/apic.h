@@ -38,8 +38,15 @@
 #define LAPIC_SIVR_SOFTWARE_ENABLE 0x100
 
 
-void init_apic(struct idt_ptr idt_ptr);
+void init_apic(struct idt_ptr* idt_ptr);
 void lapic_write(uint32_t reg, uint32_t val);
 uint32_t lapic_read(uint32_t reg);
+void lapic_timer_write(uint32_t reg, uint32_t val);
+uint32_t lapic_timer_read(uint32_t reg);
+void lapic_send_self_ipi(uint8_t vector);
+void pic_remap(uint8_t master_vector, uint8_t slave_vector);
+void lapic_enable_pic_passthrough(void);
+void pic_unmask_irq0(void);
+void pic_eoi_master(void);
 
 #endif

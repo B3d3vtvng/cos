@@ -5,6 +5,15 @@ extern void __attribute__((noreturn)) isr_apic_err(void);
 
 static uint64_t lapic_base;
 
+#define X2APIC_LVT_TIMER 0x832
+#define X2APIC_TIMER_ICR 0x833
+#define X2APIC_TIMER_CCR 0x834
+#define X2APIC_TIMER_DCR 0x83D
+
+static bool lapic_use_x2apic(void){
+    return (rdmsr(0x1B) & (1ULL << 10)) != 0;
+}
+
 void lapic_write(uint32_t reg, uint32_t val){
     volatile uint32_t* reg_addr = (uint32_t*) (lapic_base + reg);
     *reg_addr = val;
@@ -13,6 +22,31 @@ void lapic_write(uint32_t reg, uint32_t val){
 uint32_t lapic_read(uint32_t reg){
     volatile uint32_t* reg_addr = (uint32_t*) (lapic_base + reg);
     return *reg_addr;
+}
+
+void lapic_timer_write(uint32_t reg, uint32_t val){
+    if (lapic_use_x2apic()) {
+        switch (reg) {
+        case LAPIC_LVT_TIMER_REG_OFF: wrmsr(X2APIC_LVT_TIMER, val); return;
+        case LAPIC_TIMER_ICR_OFF: wrmsr(X2APIC_TIMER_ICR, val); return;
+        case LAPIC_TIMER_DCR_OFF: wrmsr(X2APIC_TIMER_DCR, val); return;
+        default: break;
+        }
+    }
+    lapic_write(reg, val);
+}
+
+uint32_t lapic_timer_read(uint32_t reg){
+    if (lapic_use_x2apic()) {
+        switch (reg) {
+        case LAPIC_LVT_TIMER_REG_OFF: return (uint32_t)rdmsr(X2APIC_LVT_TIMER);
+        case LAPIC_TIMER_ICR_OFF: return (uint32_t)rdmsr(X2APIC_TIMER_ICR);
+        case LAPIC_TIMER_CCR_OFF: return (uint32_t)rdmsr(X2APIC_TIMER_CCR);
+        case LAPIC_TIMER_DCR_OFF: return (uint32_t)rdmsr(X2APIC_TIMER_DCR);
+        default: break;
+        }
+    }
+    return lapic_read(reg);
 }
 
 bool local_apic_exists(void){
@@ -24,9 +58,14 @@ bool local_apic_exists(void){
 }
 
 void local_apic_enable(void){
-    uint64_t LAPIC_base = rdmsr(0x1B);
-    LAPIC_base |= (1ULL << 11);
-    wrmsr(0x1B, LAPIC_base);
+    uint64_t lapic_msr = rdmsr(0x1B);
+    lapic_msr &= ~(1ULL << 10);
+    lapic_msr |= (1ULL << 11);
+    wrmsr(0x1B, lapic_msr);
+
+    if (rdmsr(0x1B) & (1ULL << 10)) {
+        kernel_panic(NULL, "Failed to disable x2APIC mode\n");
+    }
 }
 
 uint64_t get_lapic_phys_base(void){
@@ -39,12 +78,47 @@ uint64_t remap_lapic(uint64_t phys){
     return virt;
 }
 
-void mask_pic(void){
-    // Mask the PIC master port
-    io_outb(0x21, 0xFF);
+void lapic_send_self_ipi(uint8_t vector){
+    if (lapic_use_x2apic()) {
+        wrmsr(0x830, vector | (1ULL << 18));
+        return;
+    }
+    lapic_write(LAPIC_ICR_OFF + 0x10, 0);
+    lapic_write(LAPIC_ICR_OFF, vector | (1ULL << 18));
+}
 
-    // Mask the PIC slave port
+void mask_pic(void){
+    io_outb(0x21, 0xFF);
     io_outb(0xA1, 0xFF);
+}
+
+void pic_remap(uint8_t master_vector, uint8_t slave_vector){
+    uint8_t master_mask = io_inb(0x21);
+    uint8_t slave_mask = io_inb(0xA1);
+
+    io_outb(0x20, 0x11);
+    io_outb(0xA0, 0x11);
+    io_outb(0x21, master_vector);
+    io_outb(0xA1, slave_vector);
+    io_outb(0x21, 0x04);
+    io_outb(0xA1, 0x02);
+    io_outb(0x21, 0x01);
+    io_outb(0xA1, 0x01);
+
+    io_outb(0x21, master_mask);
+    io_outb(0xA1, slave_mask);
+}
+
+void lapic_enable_pic_passthrough(void){
+    lapic_write(LAPIC_LVT_LINT0_REG_OFF, 0x700);
+}
+
+void pic_unmask_irq0(void){
+    io_outb(0x21, io_inb(0x21) & ~1);
+}
+
+void pic_eoi_master(void){
+    io_outb(0x20, 0x20);
 }
 
 void isr_apic_err_handler(void){
@@ -60,7 +134,7 @@ void isr_apic_err_handler(void){
 }
 
 // Initialize the APIC driver
-void init_apic(struct idt_ptr idt_ptr){
+void init_apic(struct idt_ptr* idt_ptr){
     if (!local_apic_exists()){
         kernel_panic(NULL, "Local APIC does not exist\n");
     }
@@ -81,12 +155,6 @@ void init_apic(struct idt_ptr idt_ptr){
     // Clear the Task Priority Register
     lapic_write(LAPIC_TPR_OFF, 0);
 
-    // Initialize the DFR to 0xFFFFFFFF (Flat mode)
-    lapic_write(LAPIC_DFR_OFF, 0xFFFFFFFF);
-
-    // Initialize the LDR to logical id 1
-    lapic_write(LAPIC_LDR_OFF, (1 << 24));
-
     // Mask Legacy interrupts
     lapic_write(LAPIC_LVT_LINT0_REG_OFF, 0x10000);
     lapic_write(LAPIC_LVT_LINT1_REG_OFF, 0x10000);
@@ -95,10 +163,10 @@ void init_apic(struct idt_ptr idt_ptr){
     lapic_write(LAPIC_LVT_ER_REG_OFF, 0xFE);
 
     // Register SIV handler to 0xFF
-    idt_set_gate((struct idt_entry*) idt_ptr.base, 0xFF, (uint64_t)isr_siv, 0x08, 0x8E);
+    idt_set_gate((struct idt_entry*) idt_ptr->base, 0xFF, (uint64_t)isr_siv, 0x08, 0x8E);
 
     // Register ERR handler to 0xFE
-    idt_set_gate((struct idt_entry*) idt_ptr.base, 0xFE, (uint64_t)isr_apic_err, 0x08, 0x8E);
+    idt_set_gate((struct idt_entry*) idt_ptr->base, 0xFE, (uint64_t)isr_apic_err, 0x08, 0x8E);
 
     // Clear all previous interrupts (if any)
     lapic_write(LAPIC_EOI_REG_OFF, 0);

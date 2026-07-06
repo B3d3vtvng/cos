@@ -80,7 +80,7 @@ struct gdt_ptr init_gdt_and_tss(void){
     gdtp.base = (uint64_t)entries;
     gdtp.limit = (sizeof(struct gdt_entry) * 7) - 1;
 
-    lgdt((uint64_t)&gdtp);
+    lgdt(&gdtp);
 
     return gdtp;
 }

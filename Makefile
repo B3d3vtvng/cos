@@ -104,23 +104,25 @@ build/kernel.bin: build/kernel.elf
 # =====================================
 # Stage 2 loader
 # =====================================
-build/stage2.elf: boot/stage2.s | build
+build/stage2.elf: boot/stage2.s build/kernel.bin | build
+	$(eval KERNEL_SECTORS := $(call calc_sectors,build/kernel.bin))
 	$(ASM) $(ASMFLAGS32) \
 		-DST2_SEC_CNT=1 \
 		-DSTAGE3_SEC_CNT=3 \
-		-DKERN_SEC_CNT=89 \
+		-DKERN_SEC_CNT=$(KERNEL_SECTORS) \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
 		-D__ELF__ \
 		$< -o $@ -g -F DWARF
 
-build/stage2.bin: build/stage2.elf
+build/stage2.bin: boot/stage2.s build/kernel.bin | build
+	$(eval KERNEL_SECTORS := $(call calc_sectors,build/kernel.bin))
 	$(ASM) $(ASMFLAGS_BIN) \
 		-DST2_SEC_CNT=1 \
 		-DSTAGE3_SEC_CNT=3 \
 		-DSTAGE3_BASE=0x15000 \
 		-DKERNEL_BASE=0x20000 \
-		-DKERN_SEC_CNT=89 \
+		-DKERN_SEC_CNT=$(KERNEL_SECTORS) \
 		boot/stage2.s -o $@
 
 # =====================================
